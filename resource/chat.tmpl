@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style type="text/css">
+body{
+    min-width:800px;
+    height:100%;
+    background-color:#F3F5FC;
+}
+.chatbox{
+    margin:auto;
+    width:80%;
+    overflow:hidden;
+    border:1px solid #000;
+}
+.canditem{
+    width:400px;
+    height:200px;
+    overflow-y: scroll;
+    overflow-x:hidden;
+    float:left;
+    margin:auto;
+    word-wrap:break-word;
+    border:1px solid #000;
+    display:inline-block;
+}
+
+.candidate{
+    width:100%;
+    height:210px;
+    overflow-x: scroll;
+    display: block;
+    margin:auto;
+    border:1px solid #000;
+}
+
+.content {
+    max-height: 150px;
+    overflow-y: scroll;
+}
+</style>
+<script>  
+window.addEventListener("load", function(evt) {
+    var output = document.getElementById("output");
+    var input = document.getElementById("input");
+    var ws;
+    ws = null;
+    var print = function(message) {
+        var d = document.createElement("div");
+        d.className="content"
+        d.textContent = message;
+        output.appendChild(d);
+        output.scroll(0, output.scrollHeight);
+    };
+
+    var printCandidate = function(details) {
+        var d = document.createElement("div");
+        d.className="candidate";
+        for (let i = 0; i < details.length; ++i) {
+            d.innerHTML += "<div class='canditem'><div><b>"+details[i].title+"</b></div>"+
+                "<div>"+details[i].content+"</div></div>";  
+        }
+        output.appendChild(d);
+        output.scroll(0, output.scrollHeight);
+    };
+
+    document.getElementById("clean").onclick = function(evt) {
+        output.innerHTML="";
+    }
+
+    function checkWebSocket() {
+        
+        if (ws) {
+            if (ws.readyState == WebSocket.CONNECTING || ws.readyState == WebSocket.OPEN){
+                print("======链接服务器中...=====");
+                return false;
+            }else{
+                print("======重建链接中...=====");
+            }
+            
+        }
+        ws = new WebSocket("ws://127.0.0.1:8081/llm/chat/stream");
+        ws.onopen = function(evt) {
+            print("******已链接....******");
+            
+            if(input.value != ""){
+                print("query: " + input.value);
+                ws.send(input.value);
+                input.value="";
+            }
+
+        }
+        ws.onclose = function(evt) {
+            print("======CLOSE=====");
+            document.getElementById("send").disabled = false;
+            ws = null;
+        }
+        ws.onmessage = function(evt) {
+            //alert(evt.data)
+            var msg = JSON.parse(evt.data)
+            if(msg.type=="candidate"){
+                printCandidate(msg.body);
+            }else if(msg.type=="msg"){
+                print("" + msg.body);
+            }else if(msg.type=="tokens"){
+                print("[tokens:]" + msg.body);
+                document.getElementById("send").disabled = false;
+            }else{
+                print("[unknown]" + evt.data);
+            }
+            
+            if(evt.data.indexOf("(tokens:") != -1) {
+               
+            }
+        }
+        ws.onerror = function(evt) {
+            print("ERROR: " + evt.data);
+            ws.close();
+        }
+        return false;
+    }
+    document.getElementById("send").onclick = function(evt) {
+        if(input.value == ""){
+            return false;
+        }
+        document.getElementById("send").disabled = true;
+        if (!ws) {
+            checkWebSocket();
+        }
+        if (ws.readyState == WebSocket.CONNECTING){
+            print("======链接服务器中...=====");
+        }else if(ws.readyState == WebSocket.OPEN){
+            if(input.value != ""){
+                print("query: " + input.value);
+                ws.send(input.value);
+                input.value="";
+            }
+        }else{
+            print("请重新发送...");
+            document.getElementById("send").disabled = false;
+        }
+        return false;
+    };
+    document.getElementById("close").onclick = function(evt) {
+        if (!ws) {
+            return false;
+        }
+        ws.close();
+        return false;
+    };
+});
+</script>
+</head>
+<body>
+<table class="chatbox">
+<tr height="700px">
+<td>
+<div id="output" style="max-height: 600px;overflow-y: scroll;"></div>
+</td>
+</tr>
+<tr><td valign="top" width="90%" margin="auto">
+
+<p>
+<button id="clean">清空</button>
+<input id="input" size="80" type="text" value="输入您想要咨询的旅游线路">
+<button id="send">发送</button><button id="close">中断</button>
+</td></tr></table>
+</body>
+</html>

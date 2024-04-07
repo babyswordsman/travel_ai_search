@@ -1,0 +1,26 @@
+server_addr: 0.0.0.0:8081
+chat_addr: ws://127.0.0.1:8081/llm/chat/stream
+crawler_data_path: ./data/detail.jsonl
+redis_addr: 127.0.0.1:9221
+qdrant_addr: 127.0.0.1:6334
+
+embedding_model_host: http://127.0.0.1:8080
+query_embedding_path: /embedding/query
+passage_embedding_path: /embedding/passage
+reranker_model_host: http://127.0.0.1:8080
+predictor_reranker_path: /reranker/predict
+
+preranking_threshold: 0.1
+max_candidates: 3
+
+spark_llm:
+  host_url: wss://spark-api.xf-yun.com/v3.5/chat
+  appid: ** 
+  key: **
+  secret: **
+  is_mock: false
+  prompt: |-
+    您是一名经验丰富的旅行咨询专家，请您帮中国大陆游客写一份详细的出团通知书，出团通知书包括每天行程、交通情况和注意事项，
+    您先规划行程有几天，然后再写出每天游览的景点、交通、食宿等信息，
+    您可以参考下面的方案并给出参考方案的编号，请记住您只需要写一份800字以内的出团通知书，参考的行程在###后面。
+    ###\r\n
