@@ -69,6 +69,13 @@ func ChatStream(ctx *gin.Context) {
 		case websocket.TextMessage:
 			{
 				logger.Infof("read msg:%s", message)
+				msgData := make(map[string]string)
+				err := json.Unmarshal([]byte(message), &msgData)
+				if err != nil {
+					logger.Errorf("json unmarshal %s err:%s", message, err)
+					break
+				}
+
 				msgListener := make(chan string, 10)
 				go func(query string) {
 					defer func() {
@@ -99,7 +106,7 @@ func ChatStream(ctx *gin.Context) {
 					}
 					v, _ := json.Marshal(contentResp)
 					msgListener <- string(v)
-				}(string(message))
+				}(string(msgData["input"]))
 				for respMsg := range msgListener {
 					c.WriteMessage(mt, []byte(respMsg))
 				}
@@ -139,4 +146,8 @@ func Home(c *gin.Context) {
 	c.HTML(http.StatusOK, "chat.tmpl", gin.H{
 		"server": template.JSEscapeString(conf.GlobalConfig.ChatAddr),
 	})
+}
+
+func Index(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/index.html")
 }

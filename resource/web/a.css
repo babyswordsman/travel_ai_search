@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    .cur_menu {
+        @apply decoration-4;
+        @apply p-4;
+        @apply text-2xl;
+        @apply bg-gray-300;
+        
+    }
+    .menu {
+        @apply p-4;
+        @apply text-xl;
+        
+    }
+}

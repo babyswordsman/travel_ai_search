@@ -14,6 +14,7 @@ var CHAT_TYPE_TOKENS = "tokens"
 var CHAT_TYPE_MSG = "msg"
 
 type ChatStream struct {
-	Type string      `json:"type"`
-	Body interface{} `json:"body"`
+	Type  string      `json:"type"`
+	Body  interface{} `json:"body"`
+	Seqno string      `json:"seqno"`
 }

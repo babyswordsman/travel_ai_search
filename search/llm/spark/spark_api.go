@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"travel_ai_search/search/conf"
@@ -81,11 +82,13 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 		}
 		//fmt.Println(string(msg))
 		//解析数据
+
 		payload := data["payload"].(map[string]interface{})
 		choices := payload["choices"].(map[string]interface{})
 		header := data["header"].(map[string]interface{})
 		code := header["code"].(float64)
-
+		sid := data["sid"].(string)
+		seq := choices["seq"].(float64)
 		if code != 0 {
 			return "", totalTokens
 		}
@@ -96,8 +99,9 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 		if status != 2 {
 			if msgListener != nil {
 				contentResp := llm.ChatStream{
-					Type: llm.CHAT_TYPE_MSG,
-					Body: content,
+					Type:  llm.CHAT_TYPE_MSG,
+					Body:  content,
+					Seqno: sid + "_" + strconv.FormatInt(int64(seq), 10),
 				}
 				v, _ := json.Marshal(contentResp)
 				msgListener <- string(v)
@@ -108,8 +112,9 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 			//fmt.Println("收到最终结果")
 			if msgListener != nil {
 				contentResp := llm.ChatStream{
-					Type: llm.CHAT_TYPE_MSG,
-					Body: content,
+					Type:  llm.CHAT_TYPE_MSG,
+					Body:  content,
+					Seqno: sid + "_" + strconv.FormatInt(int64(seq), 10),
 				}
 				v, _ := json.Marshal(contentResp)
 				msgListener <- string(v)

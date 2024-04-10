@@ -46,3 +46,14 @@ scrapy 一个python写的爬虫框架
 3、模拟浏览器：selenium   splash 
 
 反爬： IP  header校验  cookie  加密   JS混淆   动态内容拼接
+
+升级GLIBC 
+vim /etc/apt/sources.list
+```
+#增加
+deb http://mirrors.aliyun.com/ubuntu/ jammy main
+apt-get update
+apt install libc6
+
+strings /lib/x86_b4-linux-gnu/libc.so.6 | grep GLIBC_
+```

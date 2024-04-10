@@ -131,16 +131,18 @@ func LLMChatStreamMock(query string, msgListener chan string) (string, int64) {
 	msgListener <- string(v)
 
 	msgResp := llm.ChatStream{
-		Type: llm.CHAT_TYPE_MSG,
-		Body: prompt,
+		Type:  llm.CHAT_TYPE_MSG,
+		Body:  prompt,
+		Seqno: "1",
 	}
 	v, _ = json.Marshal(msgResp)
 	msgListener <- string(v)
 
 	for i := 0; i < 10; i++ {
 		msgResp := llm.ChatStream{
-			Type: llm.CHAT_TYPE_MSG,
-			Body: fmt.Sprintf("第%d天", i),
+			Type:  llm.CHAT_TYPE_MSG,
+			Body:  fmt.Sprintf("第%d天", i),
+			Seqno: "2",
 		}
 		v, _ := json.Marshal(msgResp)
 		msgListener <- string(v)

@@ -16,6 +16,8 @@ import (
 )
 
 func init_router(r *gin.Engine) {
+	//r.GET("/", search.Index)
+
 	manage_route := r.Group("manage")
 	{
 		manage_route.GET("/init_data", search.InitData)
@@ -27,6 +29,7 @@ func init_router(r *gin.Engine) {
 		chat_route.POST("/chat", search.Chat)
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)
+
 	}
 }
 
@@ -79,7 +82,9 @@ func main() {
 
 	//启动对外服务接口
 	r := gin.Default()
-	r.LoadHTMLGlob("resource/*")
+	r.LoadHTMLGlob("resource/*.tmpl")
+	r.StaticFile("/output.css", "./resource/web/output.css")
+	r.StaticFile("/", "./resource/web/index.html")
 	init_router(r)
 	logger.Info("start gin: ", config.ServerAddr)
 	r.Run(config.ServerAddr)
