@@ -8,6 +8,7 @@ import (
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/llm"
 	"travel_ai_search/search/manage"
+	"travel_ai_search/search/user"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -28,7 +29,7 @@ func InitData(c *gin.Context) {
 	})
 }
 
-func ChatPrompt(c *gin.Context) {
+func PrintChatPrompt(c *gin.Context) {
 
 	req := ChatRequest{}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
@@ -57,6 +58,8 @@ func ChatStream(ctx *gin.Context) {
 
 	defer c.Close()
 
+	curUser := user.GetCurUser(ctx)
+
 	for {
 		mt, message, err := c.ReadMessage()
 		if err != nil {
@@ -77,7 +80,7 @@ func ChatStream(ctx *gin.Context) {
 				}
 
 				msgListener := make(chan string, 10)
-				go func(query string) {
+				go func(user user.User, room string, query string) {
 					defer func() {
 						if err := recover(); err != nil {
 							logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
@@ -94,10 +97,10 @@ func ChatStream(ctx *gin.Context) {
 					}()
 					tokens := int64(0)
 					if conf.GlobalConfig.SparkLLM.IsMock {
-						_, tokens = LLMChatStreamMock(query, msgListener)
+						_, tokens = LLMChatStreamMock(room, query, msgListener, llm.LoadChatHistory(curUser.UserId))
 
 					} else {
-						_, tokens = LLMChatStream(query, msgListener)
+						_, tokens = LLMChatStream(room, query, msgListener, llm.LoadChatHistory(curUser.UserId))
 					}
 
 					contentResp := llm.ChatStream{
@@ -106,7 +109,7 @@ func ChatStream(ctx *gin.Context) {
 					}
 					v, _ := json.Marshal(contentResp)
 					msgListener <- string(v)
-				}(string(msgData["input"]))
+				}(curUser, string(msgData["room"]), string(msgData["input"]))
 				for respMsg := range msgListener {
 					c.WriteMessage(mt, []byte(respMsg))
 				}

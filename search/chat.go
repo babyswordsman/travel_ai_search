@@ -15,6 +15,7 @@ import (
 	"travel_ai_search/search/qdrant"
 
 	logger "github.com/sirupsen/logrus"
+	"github.com/tmc/langchaingo/schema"
 )
 
 func SearchCandidate(query string, threshold float32) ([]map[string]string, error) {
@@ -63,19 +64,68 @@ func SearchCandidate(query string, threshold float32) ([]map[string]string, erro
 
 }
 
-func Prompt(candidates []map[string]string) string {
+func TravelPrompt(candidates []map[string]string) string {
+	//todo:截断
 	buf := strings.Builder{}
-	buf.WriteString(conf.GlobalConfig.SparkLLM.Prompt)
+	buf.WriteString(conf.GlobalConfig.SparkLLM.TravelPrompt)
 	buf.WriteString("\r\n")
+	remain := 1024
 	for ind, detail := range candidates {
-		buf.WriteString("方案" + strconv.Itoa(ind+1) + ":")
-		buf.WriteString("\r\n")
-		buf.WriteString(detail[conf.DETAIL_TITLE_FIELD])
-		//buf.WriteString("\r\n")
-		//buf.WriteString(detail[conf.DETAIL_CONTENT_FIELD])
-		//buf.WriteString("\r\n")
-		buf.WriteString("\r\n")
+		titleLen := len(detail[conf.DETAIL_TITLE_FIELD])
+		contentLen := len(detail[conf.DETAIL_CONTENT_FIELD])
+		if remain-titleLen > 0 {
+			buf.WriteString("方案" + strconv.Itoa(ind+1) + ":")
+			buf.WriteString("\r\n")
+			buf.WriteString(detail[conf.DETAIL_TITLE_FIELD])
+			remain = remain - titleLen
+		} else {
+			break
+		}
+
+		if remain-contentLen > 0 {
+			buf.WriteString("\r\n")
+			buf.WriteString(detail[conf.DETAIL_CONTENT_FIELD])
+			buf.WriteString("\r\n")
+			remain = remain - contentLen
+		} else {
+			break
+		}
+
 	}
+	buf.WriteString("\r\n")
+	logger.Info(buf.String())
+	return buf.String()
+}
+
+func ChatPrompt(candidates []map[string]string) string {
+	//todo:截断
+	buf := strings.Builder{}
+	buf.WriteString(conf.GlobalConfig.SparkLLM.TravelPrompt)
+	buf.WriteString("\r\n")
+	remain := 1024
+	for ind, detail := range candidates {
+		titleLen := len(detail[conf.DETAIL_TITLE_FIELD])
+		contentLen := len(detail[conf.DETAIL_CONTENT_FIELD])
+		if remain-titleLen > 0 {
+			buf.WriteString("方案" + strconv.Itoa(ind+1) + ":")
+			buf.WriteString("\r\n")
+			buf.WriteString(detail[conf.DETAIL_TITLE_FIELD])
+			remain = remain - titleLen
+		} else {
+			break
+		}
+
+		if remain-contentLen > 0 {
+			buf.WriteString("\r\n")
+			buf.WriteString(detail[conf.DETAIL_CONTENT_FIELD])
+			buf.WriteString("\r\n")
+			remain = remain - contentLen
+		} else {
+			break
+		}
+
+	}
+	buf.WriteString("\r\n")
 	logger.Info(buf.String())
 	return buf.String()
 }
@@ -89,7 +139,7 @@ func LLMChatPrompt(query string) string {
 	if len(details) == 0 {
 		return conf.EmptyHint
 	}
-	prompt := Prompt(details)
+	prompt := TravelPrompt(details)
 	return prompt
 }
 
@@ -102,47 +152,83 @@ func LLMChat(query string) (string, int64) {
 	if len(details) == 0 {
 		return conf.EmptyHint, 0
 	}
-	prompt := Prompt(details)
-	systemMsg := llm.Message{Role: llm.ROLE_SYSTEM, Content: prompt}
-	queryMsg := llm.Message{Role: llm.ROLE_USER, Content: query}
-	resp, totalTokens := spark.GetChatRes([]llm.Message{systemMsg, queryMsg}, nil)
+	prompt := TravelPrompt(details)
+	systemMsg := schema.SystemChatMessage{
+		Content: prompt,
+	}
+	queryMsg := schema.HumanChatMessage{
+		Content: query,
+	}
+	resp, totalTokens := spark.GetChatRes([]schema.ChatMessage{systemMsg, queryMsg}, nil)
 	return resp, totalTokens
 
 }
 
-func LLMChatStreamMock(query string, msgListener chan string) (string, int64) {
-	details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
-	if err != nil {
-		return conf.ErrHint, 0
+func LLMChatStreamMock(room string, query string, msgListener chan string, chatHistorys []schema.ChatMessage) (string, int64) {
+	var prompt string
+
+	if room == "travel" {
+		details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
+		if err != nil {
+			return conf.ErrHint, 0
+		}
+		if len(details) == 0 {
+			return conf.EmptyHint, 0
+		}
+		prompt = TravelPrompt(details)
+		candidateResp := llm.ChatStream{
+			Type: llm.CHAT_TYPE_CANDIDATE,
+			Body: details,
+		}
+		v, _ := json.Marshal(candidateResp)
+		msgListener <- string(v)
+	} else {
+		prompt = conf.GlobalConfig.SparkLLM.ChatPrompt
+		//todo: search engine
 	}
 
-	if len(details) == 0 {
-		return conf.EmptyHint, 0
+	//systemMsg := llm.Message{Role: llm.ROLE_SYSTEM, Content: prompt}
+	//queryMsg := llm.Message{Role: llm.ROLE_USER, Content: query}
+	systemMsg := schema.SystemChatMessage{
+		Content: prompt,
 	}
-	time.Sleep(time.Second * 2)
-
-	prompt := Prompt(details)
-
-	candidateResp := llm.ChatStream{
-		Type: llm.CHAT_TYPE_CANDIDATE,
-		Body: details,
+	userMsg := schema.HumanChatMessage{
+		Content: query,
 	}
-	v, _ := json.Marshal(candidateResp)
-	msgListener <- string(v)
 
-	msgResp := llm.ChatStream{
-		Type:  llm.CHAT_TYPE_MSG,
-		Body:  prompt,
-		Seqno: "1",
+	contentLength := 0
+	contentLength += len(systemMsg.GetContent())
+	contentLength += len(userMsg.GetContent())
+
+	msgs := make([]schema.ChatMessage, 0, len(chatHistorys)+2)
+	msgs = append(msgs, systemMsg)
+	//todo: 暂时只接受最长1024的长度，给prompt留了1024，后续再改成限制总长度
+	remain := 1024 - len(userMsg.GetContent())
+	for i := len(chatHistorys) - 1; i <= 0; i-- {
+		remain = remain - len(chatHistorys[i].GetContent())
+		if remain > 0 {
+			msgs = append(msgs, chatHistorys[i])
+		} else {
+			break
+		}
 	}
-	v, _ = json.Marshal(msgResp)
-	msgListener <- string(v)
+	msgs = append(msgs, userMsg)
 
+	seqno := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	for _, msg := range msgs {
+		msgResp := llm.ChatStream{
+			Type:  llm.CHAT_TYPE_MSG,
+			Body:  msg.GetContent(),
+			Seqno: seqno,
+		}
+		v, _ := json.Marshal(msgResp)
+		msgListener <- string(v)
+	}
 	for i := 0; i < 10; i++ {
 		msgResp := llm.ChatStream{
 			Type:  llm.CHAT_TYPE_MSG,
 			Body:  fmt.Sprintf("第%d天", i),
-			Seqno: "2",
+			Seqno: seqno,
 		}
 		v, _ := json.Marshal(msgResp)
 		msgListener <- string(v)
@@ -150,27 +236,54 @@ func LLMChatStreamMock(query string, msgListener chan string) (string, int64) {
 	return "sssss", 10
 }
 
-func LLMChatStream(query string, msgListener chan string) (answer string, totalTokens int64) {
-	details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
-	if err != nil {
-		return conf.ErrHint, 0
-	}
+func LLMChatStream(room string, query string, msgListener chan string, chatHistorys []schema.ChatMessage) (answer string, totalTokens int64) {
+	var prompt string
 
-	if len(details) == 0 {
-		return conf.EmptyHint, 0
+	if room == "travel" {
+		details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
+		if err != nil {
+			return conf.ErrHint, 0
+		}
+		if len(details) == 0 {
+			return conf.EmptyHint, 0
+		}
+		prompt = TravelPrompt(details)
+		candidateResp := llm.ChatStream{
+			Type: llm.CHAT_TYPE_CANDIDATE,
+			Body: details,
+		}
+		v, _ := json.Marshal(candidateResp)
+		msgListener <- string(v)
+	} else {
+		prompt = conf.GlobalConfig.SparkLLM.ChatPrompt
+		//todo: search engine
 	}
-	prompt := Prompt(details)
-	systemMsg := llm.Message{Role: llm.ROLE_SYSTEM, Content: prompt}
-	queryMsg := llm.Message{Role: llm.ROLE_USER, Content: query}
-	entry := logger.WithField("query", queryMsg).WithField("system", systemMsg)
-	candidateResp := llm.ChatStream{
-		Type: llm.CHAT_TYPE_CANDIDATE,
-		Body: details,
+	systemMsg := schema.SystemChatMessage{
+		Content: prompt,
 	}
-	v, _ := json.Marshal(candidateResp)
-	msgListener <- string(v)
+	userMsg := schema.HumanChatMessage{
+		Content: query,
+	}
+	entry := logger.WithField("query", userMsg).WithField("system", systemMsg)
 
-	answer, totalTokens = spark.GetChatRes([]llm.Message{systemMsg, queryMsg}, msgListener)
+	contentLength := 0
+	contentLength += len(systemMsg.GetContent())
+	contentLength += len(userMsg.GetContent())
+
+	msgs := make([]schema.ChatMessage, 0, len(chatHistorys)+2)
+	msgs = append(msgs, systemMsg)
+	//todo: 暂时只接受最长1024的长度，给prompt留了1024，后续再改成限制总长度
+	remain := 1024 - len(userMsg.GetContent())
+	for i := len(chatHistorys) - 1; i <= 0; i-- {
+		remain = remain - len(chatHistorys[i].GetContent())
+		if remain > 0 {
+			msgs = append(msgs, chatHistorys[i])
+		} else {
+			break
+		}
+	}
+	msgs = append(msgs, userMsg)
+	answer, totalTokens = spark.GetChatRes(msgs, msgListener)
 	entry.WithField("totalTokens", totalTokens).WithField("answer", answer).Info("[chat]")
 	return
 }

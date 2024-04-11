@@ -4,17 +4,52 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 	"travel_ai_search/search"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/qdrant"
+	"travel_ai_search/search/user"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	logger "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v3"
 )
 
+func CheckSign(c *gin.Context) {
+	session := sessions.DefaultMany(c, conf.GlobalConfig.CookieSession)
+	obj := session.Get(conf.GlobalConfig.CookieUser)
+	if obj == nil {
+		//c.Redirect(http.StatusOK, "/login")
+		//return
+
+		//暂时不关联用户，分配一个自定义ID
+		id, err := uuid.NewUUID()
+		if err != nil {
+			logger.Errorf("new uuid err:%s", err)
+		}
+		user := user.User{
+			UserId:   id.String(),
+			Lasttime: time.Now(),
+		}
+		session.Set(conf.GlobalConfig.CookieUser, user)
+		session.Save()
+		logger.Infof("add new user:%s", user.UserId)
+		c.Next()
+	} else {
+
+		user := obj.(user.User)
+		logger.Infof("user:%s,lasttime:%s", user.UserId, user.Lasttime.Format("2006-01-02 15:04:05"))
+		user.Lasttime = time.Now()
+		//session.Save()
+		c.Next()
+	}
+
+}
 func init_router(r *gin.Engine) {
 	//r.GET("/", search.Index)
 
@@ -24,8 +59,16 @@ func init_router(r *gin.Engine) {
 	}
 
 	chat_route := r.Group("llm")
+	store := cookie.NewStore([]byte(conf.GlobalConfig.CookieCodeKey))
+	store.Options(sessions.Options{
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   3600 * 24 * 30,
+	})
+	chat_route.Use(sessions.SessionsMany([]string{conf.GlobalConfig.CookieSession}, store), CheckSign)
 	{
-		chat_route.POST("/chat_prompt", search.ChatPrompt)
+
+		chat_route.POST("/chat_prompt", search.PrintChatPrompt)
 		chat_route.POST("/chat", search.Chat)
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)

@@ -1,18 +1,27 @@
 package conf
 
 type SparkLLM struct {
-	HostUrl string `yaml:"host_url"`
-	Appid   string `yaml:"appid"`
-	Secret  string `yaml:"secret"`
-	Key     string `yaml:"key"`
-	Prompt  string `yaml:"prompt"`
-	IsMock  bool   `yaml:"is_mock"`
+	HostUrl      string `yaml:"host_url"`
+	Appid        string `yaml:"appid"`
+	Secret       string `yaml:"secret"`
+	Key          string `yaml:"key"`
+	ChatPrompt   string `yaml:"chat_prompt"`
+	TravelPrompt string `yaml:"travel_prompt"`
+	IsMock       bool   `yaml:"is_mock"`
 }
 
 type Config struct {
 	//服务地址：0.0.0.0:8080
 	ServerAddr string `yaml:"server_addr"`
-	ChatAddr   string `yaml:"chat_addr"`
+
+	//前端websocket地址
+	ChatAddr string `yaml:"chat_addr"`
+
+	CookieCodeKey string `yaml:"cookie_code_key"`
+
+	CookieUser string `yaml:"cookie_user"`
+
+	CookieSession string `yaml:"cookie_session"`
 
 	//爬虫数据目录
 	CrawlerDataPath string `yaml:"crawler_data_path"`

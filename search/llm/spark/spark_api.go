@@ -21,6 +21,7 @@ import (
 	"travel_ai_search/search/llm"
 
 	"github.com/gorilla/websocket"
+	"github.com/tmc/langchaingo/schema"
 )
 
 /**
@@ -28,7 +29,7 @@ import (
  * 错误码链接：https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html（code返回错误码时必看）
  * @author iflytek
  */
-func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64) {
+func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string, int64) {
 	// fmt.Println(HmacWithShaTobase64("hmac-sha256", "hello\nhello", "hello"))
 	// st := time.Now()
 	d := websocket.Dialer{
@@ -58,14 +59,28 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 	}
 
 	go func() {
-
-		data := genParams1(conf.GlobalConfig.SparkLLM.Appid, messages)
+		sparkMsgs := make([]llm.Message, 0, len(messages))
+		textLen := 0
+		for _, msg := range messages {
+			switch msg.GetType() {
+			case schema.ChatMessageTypeSystem:
+				sparkMsgs = append(sparkMsgs, llm.Message{Role: llm.ROLE_SYSTEM, Content: msg.GetContent()})
+			case schema.ChatMessageTypeHuman:
+				sparkMsgs = append(sparkMsgs, llm.Message{Role: llm.ROLE_USER, Content: msg.GetContent()})
+			default:
+				sparkMsgs = append(sparkMsgs, llm.Message{Role: llm.ROLE_ASSISTANT, Content: msg.GetContent()})
+			}
+			textLen += len(msg.GetContent())
+		}
+		
+		data := genParams1(conf.GlobalConfig.SparkLLM.Appid, sparkMsgs)
 		conn.WriteJSON(data)
 
 	}()
 
 	var answer strings.Builder
 	var totalTokens int64 = 0
+	var seqno = time.Now().UnixNano()
 	//获取返回的数据
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -87,8 +102,9 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 		choices := payload["choices"].(map[string]interface{})
 		header := data["header"].(map[string]interface{})
 		code := header["code"].(float64)
-		sid := data["sid"].(string)
-		seq := choices["seq"].(float64)
+		sid := data["sid"]
+		seq := choices["seq"]
+		fmt.Printf("sid:%v,seq:%v", sid, seq)
 		if code != 0 {
 			return "", totalTokens
 		}
@@ -96,12 +112,13 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 		//fmt.Println(status)
 		text := choices["text"].([]interface{})
 		content := text[0].(map[string]interface{})["content"].(string)
+		fmt.Print(content)
 		if status != 2 {
 			if msgListener != nil {
 				contentResp := llm.ChatStream{
 					Type:  llm.CHAT_TYPE_MSG,
-					Body:  content,
-					Seqno: sid + "_" + strconv.FormatInt(int64(seq), 10),
+					Body:  content, //strings.ReplaceAll(content, "\n", "<br />"),
+					Seqno: strconv.FormatInt(seqno, 10),
 				}
 				v, _ := json.Marshal(contentResp)
 				msgListener <- string(v)
@@ -113,8 +130,8 @@ func GetChatRes(messages []llm.Message, msgListener chan string) (string, int64)
 			if msgListener != nil {
 				contentResp := llm.ChatStream{
 					Type:  llm.CHAT_TYPE_MSG,
-					Body:  content,
-					Seqno: sid + "_" + strconv.FormatInt(int64(seq), 10),
+					Body:  content, //strings.ReplaceAll(content, "\n", "<br />"),
+					Seqno: strconv.FormatInt(seqno, 10),
 				}
 				v, _ := json.Marshal(contentResp)
 				msgListener <- string(v)

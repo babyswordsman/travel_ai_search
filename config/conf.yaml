@@ -1,5 +1,8 @@
 server_addr: 0.0.0.0:8081
 chat_addr: ws://127.0.0.1:8081/llm/chat/stream
+cookie_code_key: ***
+cookie_session: cookie_sess
+cookie_user: ai_search_user
 crawler_data_path: ./data/detail.jsonl
 redis_addr: 127.0.0.1:9221
 qdrant_addr: 127.0.0.1:6334
@@ -19,8 +22,14 @@ spark_llm:
   key: **
   secret: **
   is_mock: false
-  prompt: |-
+  travel_prompt: |-
     您是一名经验丰富的旅行咨询专家，请您帮中国大陆游客写一份详细的出团通知书，出团通知书包括每天行程、交通情况和注意事项，
     您先规划行程有几天，然后再写出每天游览的景点、交通、食宿等信息，
     您可以参考下面的方案并给出参考方案的编号，请记住您只需要写一份800字以内的出团通知书，参考的行程在###后面。
+    ###\r\n
+  
+  chat_prompt: |-
+    您是智能助手，会按照用户的提问回答相应的问题，当您不是很确定时请回答我暂时无法回答这个问题。
+    您会分析下面的背景信息是否与用户问题相关，如果相关请仔细思考，基于背景信息进行回答，如果不相关请忽略相关背景信息。
+    当问题没有直接答案时，请先总结基本规律再回答。
     ###\r\n
