@@ -21,6 +21,13 @@
         chatroom = "chat";
       }
 
+      var mysubstr = function(str,len){
+        if(str.length > len){
+          str = str.substr(0,len)+"..."
+        }
+        return str
+      }
+
         var output = document.getElementById("output");
         var input = document.getElementById("input");
         var ws;
@@ -41,17 +48,20 @@
         }
     
         var printCandidate = function(details) {
+            if(details.length <=0){
+              return false;
+            }
             var d = document.createElement("div");
-            d.className="flex flex-nowrap overflow-auto h-40  mt-2";
+            d.className="flex flex-nowrap overflow-auto h-44  mt-2";
             for (let i = 0; i < details.length; ++i) {
               var candidate = document.createElement("div");
-              candidate.className="w-96  h-40 min-w-96 min-h-40 border overflow-y-auto  m-2 border-red-400 ";
-              var title = document.createElement("span");
-              title.className = "w-80 h-6 truncate ...";
-              title.textContent=details[i].title;
-              var cont = document.createElement("span");
-              cont.className="w-80 h-32 overflow-y-auto text-ellipsis overflow-hidden ...";
-              cont.textContent = details[i].content;
+              candidate.className="w-96  h-40 min-w-96 min-h-40 border overflow-y-auto  m-2 border-gray-200 ";
+              var title = document.createElement("div");
+              title.className = "w-[370px] pl-2 font-bold text-xl text-left ";
+              title.textContent=mysubstr(details[i].title,16);
+              var cont = document.createElement("div");
+              cont.className="w-[370px]  text-left pl-2  h-32 ";
+              cont.textContent = mysubstr(details[i].content,154);
               candidate.appendChild(title);
               candidate.appendChild(cont);
               d.appendChild(candidate);  
@@ -172,8 +182,8 @@
     </div>
     <div class="h-screen border-4 w-3/4 flex flex-col">
       <!-- 上边区域 -->
-      <div class=" border-2 flex-1 bg-gray-50 border-gray-100 rounded p-10  overflow-auto ">
-          <div id="output" class="block ">
+      <div id="output"  class=" border-2 flex-1 bg-gray-50 border-gray-100 rounded p-10  overflow-auto ">
+          <!-- div id="output" class="block " -->
             <!-- <div class="text-left border-1 mt-2 bg-gray-100 rounded  p-2">你说什么</div> -->
             <!--参考页面-->
             <!--
@@ -192,7 +202,7 @@
               大段文字
             </div>
           -->
-          </div>
+          <!--/div -->
           <!-- <div class="border-b-2 border-gray-500 m-4"></div> -->
           <!----------->   
           

@@ -21,6 +21,7 @@ import (
 	"travel_ai_search/search/llm"
 
 	"github.com/gorilla/websocket"
+	logger "github.com/sirupsen/logrus"
 	"github.com/tmc/langchaingo/schema"
 )
 
@@ -72,8 +73,9 @@ func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string,
 			}
 			textLen += len(msg.GetContent())
 		}
-		
+
 		data := genParams1(conf.GlobalConfig.SparkLLM.Appid, sparkMsgs)
+		logger.Infof("send:%s", data)
 		conn.WriteJSON(data)
 
 	}()
@@ -112,9 +114,12 @@ func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string,
 		//fmt.Println(status)
 		text := choices["text"].([]interface{})
 		content := text[0].(map[string]interface{})["content"].(string)
-		fmt.Print(content)
+		logger.Infof("status:%f,receive:%s", status, content)
+		//fmt.Print(content)
 		if status != 2 {
 			if msgListener != nil {
+				content = strings.ReplaceAll(content, "\r\n", "<br />")
+				content = strings.ReplaceAll(content, "\n", "<br />")
 				contentResp := llm.ChatStream{
 					Type:  llm.CHAT_TYPE_MSG,
 					Body:  content, //strings.ReplaceAll(content, "\n", "<br />"),
@@ -128,6 +133,8 @@ func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string,
 		} else {
 			//fmt.Println("收到最终结果")
 			if msgListener != nil {
+				content = strings.ReplaceAll(content, "\r\n", "<br />")
+				content = strings.ReplaceAll(content, "\n", "<br />")
 				contentResp := llm.ChatStream{
 					Type:  llm.CHAT_TYPE_MSG,
 					Body:  content, //strings.ReplaceAll(content, "\n", "<br />"),

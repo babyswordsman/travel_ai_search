@@ -80,7 +80,7 @@ func ChatStream(ctx *gin.Context) {
 				}
 
 				msgListener := make(chan string, 10)
-				go func(user user.User, room string, query string) {
+				go func(userInfo user.User, room string, query string) {
 					defer func() {
 						if err := recover(); err != nil {
 							logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
@@ -96,13 +96,16 @@ func ChatStream(ctx *gin.Context) {
 						close(msgListener)
 					}()
 					tokens := int64(0)
+					answer := ""
 					if conf.GlobalConfig.SparkLLM.IsMock {
-						_, tokens = LLMChatStreamMock(room, query, msgListener, llm.LoadChatHistory(curUser.UserId))
+						answer, tokens = LLMChatStreamMock(room, query, msgListener, llm.LoadChatHistory(userInfo.UserId))
 
 					} else {
-						_, tokens = LLMChatStream(room, query, msgListener, llm.LoadChatHistory(curUser.UserId))
+						answer, tokens = LLMChatStream(room, query, msgListener, llm.LoadChatHistory(userInfo.UserId))
 					}
-
+					if answer != "" {
+						llm.AddChatHistory(userInfo.UserId, query, answer)
+					}
 					contentResp := llm.ChatStream{
 						Type: llm.CHAT_TYPE_TOKENS,
 						Body: tokens,
@@ -111,6 +114,8 @@ func ChatStream(ctx *gin.Context) {
 					msgListener <- string(v)
 				}(curUser, string(msgData["room"]), string(msgData["input"]))
 				for respMsg := range msgListener {
+					logger.Infof("send to browser:%s", respMsg)
+
 					c.WriteMessage(mt, []byte(respMsg))
 				}
 				//maybe close

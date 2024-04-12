@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	logger "github.com/sirupsen/logrus"
 )
 
 type User struct {
@@ -25,6 +26,9 @@ func GetCurUser(c *gin.Context) User {
 	if obj == nil {
 		return EmpytUser
 	} else {
-		return obj.(User)
+
+		user := obj.(User)
+		logger.Infof("cur user:%s", user.UserId)
+		return user
 	}
 }
