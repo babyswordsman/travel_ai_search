@@ -10,6 +10,15 @@ type SparkLLM struct {
 	IsMock       bool   `yaml:"is_mock"`
 }
 
+type GoogleCustomSearch struct {
+	Key   string `yaml:"key"`
+	Appid string `yaml:"cx"`
+	Url   string `yaml:"url"`
+	Hl    string `yaml:"hl"`
+	Lr    string `yaml:"lr"`
+	Cr    string `yaml:"cr"`
+}
+
 type Config struct {
 	//服务地址：0.0.0.0:8080
 	ServerAddr string `yaml:"server_addr"`
@@ -44,6 +53,8 @@ type Config struct {
 	MaxCandidates int32 `yaml:"max_candidates"`
 
 	SparkLLM SparkLLM `yaml:"spark_llm"`
+
+	GoogleCustomSearch GoogleCustomSearch `yaml:"google_custom_search"`
 }
 
 var ErrHint = "这个问题，我不知道该怎么回答，我可能需要升级了..."

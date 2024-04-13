@@ -4,16 +4,21 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"strconv"
+	"time"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/llm"
+	"travel_ai_search/search/llm/spark"
 	"travel_ai_search/search/manage"
+	searchengineapi "travel_ai_search/search/search_engine_api"
 	"travel_ai_search/search/user"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/gorilla/websocket"
 	logger "github.com/sirupsen/logrus"
+	"github.com/tmc/langchaingo/schema"
 )
 
 type ChatRequest struct {
@@ -40,13 +45,113 @@ func PrintChatPrompt(c *gin.Context) {
 		return
 	}
 	logger.WithField("req", c.GetString(gin.BodyBytesKey)).Info("request chat prompt")
-	resp := LLMChatPrompt(req.Query)
+
+	engine := &ChatEngine{
+		SearchEngine: &searchengineapi.LocalSearchEngine{},
+		Prompt: &llm.TravelPrompt{
+			MaxLength:    1024,
+			PromptPrefix: conf.GlobalConfig.SparkLLM.TravelPrompt,
+		},
+		Model: &spark.SparkModel{},
+	}
+
+	resp, _ := engine.LLMChatPrompt(req.Query)
 	c.JSON(http.StatusOK, gin.H{
 		"prompt": resp,
 	})
 }
 
 var chatUpgrader = websocket.Upgrader{}
+
+func dealChatRequest(curUser user.User, msgData map[string]string, msgListener chan string) {
+	go func(userInfo user.User, room string, query string) {
+		defer func() {
+			if err := recover(); err != nil {
+				logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
+
+				contentResp := llm.ChatStream{
+					Type: llm.CHAT_TYPE_TOKENS,
+					Body: 0,
+					Room: room,
+				}
+				v, _ := json.Marshal(contentResp)
+				msgListener <- string(v)
+
+			}
+			close(msgListener)
+		}()
+		tokens := int64(0)
+		answer := ""
+
+		var searchEngine searchengineapi.SearchEngine
+		var prompt llm.Prompt
+		var model llm.GenModel
+		switch room {
+		case "travel":
+			searchEngine = &searchengineapi.LocalSearchEngine{}
+			prompt = &llm.TravelPrompt{
+				MaxLength:    1024,
+				PromptPrefix: conf.GlobalConfig.SparkLLM.TravelPrompt,
+			}
+			model = &spark.SparkModel{Room: room}
+		case "chat":
+			fallthrough
+		default:
+			searchEngine = &searchengineapi.GoogleSearchEngine{}
+			prompt = &llm.TravelPrompt{
+				MaxLength:    1024,
+				PromptPrefix: conf.GlobalConfig.SparkLLM.ChatPrompt,
+			}
+			model = &spark.SparkModel{Room: room}
+		}
+
+		engine := &ChatEngine{
+			SearchEngine: searchEngine,
+			Prompt:       prompt,
+			Model:        model,
+			Room:         room,
+		}
+		if conf.GlobalConfig.SparkLLM.IsMock {
+			answer, tokens = engine.LLMChatStreamMock(query, msgListener, llm.LoadChatHistory(userInfo.UserId, room))
+
+		} else {
+			answer, tokens = engine.LLMChatStream(query, msgListener, llm.LoadChatHistory(userInfo.UserId, room))
+		}
+		if answer != "" {
+			llm.AddChatHistory(userInfo.UserId, room, query, answer)
+		}
+		contentResp := llm.ChatStream{
+			ChatType: string(schema.ChatMessageTypeAI),
+			Room:     room,
+			Type:     llm.CHAT_TYPE_TOKENS,
+			Body:     tokens,
+		}
+		v, _ := json.Marshal(contentResp)
+		msgListener <- string(v)
+	}(curUser, string(msgData["room"]), string(msgData["input"]))
+}
+
+func dealChatHistory(curUser user.User, msgData map[string]string, msgListener chan string) {
+	//用户历史没有区分频道
+	defer func() {
+		close(msgListener)
+	}()
+	room := msgData["room"]
+	msgs := llm.LoadChatHistory(curUser.UserId, room)
+	seqno := time.Now().UnixNano()
+	for i, msg := range msgs {
+		contentResp := llm.ChatStream{
+			Room:     room,
+			ChatType: string(msg.GetType()),
+			Type:     llm.CHAT_TYPE_MSG,
+			Body:     msg.GetContent(), //strings.ReplaceAll(content, "\n", "<br />"),
+			Seqno:    strconv.FormatInt(seqno+int64(i), 10),
+		}
+		buf, _ := json.Marshal(contentResp)
+		msgListener <- string(buf)
+	}
+
+}
 
 func ChatStream(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
@@ -80,44 +185,20 @@ func ChatStream(ctx *gin.Context) {
 				}
 
 				msgListener := make(chan string, 10)
-				go func(userInfo user.User, room string, query string) {
-					defer func() {
-						if err := recover(); err != nil {
-							logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
 
-							contentResp := llm.ChatStream{
-								Type: llm.CHAT_TYPE_TOKENS,
-								Body: 0,
-							}
-							v, _ := json.Marshal(contentResp)
-							msgListener <- string(v)
-
-						}
-						close(msgListener)
-					}()
-					tokens := int64(0)
-					answer := ""
-					if conf.GlobalConfig.SparkLLM.IsMock {
-						answer, tokens = LLMChatStreamMock(room, query, msgListener, llm.LoadChatHistory(userInfo.UserId))
-
-					} else {
-						answer, tokens = LLMChatStream(room, query, msgListener, llm.LoadChatHistory(userInfo.UserId))
-					}
-					if answer != "" {
-						llm.AddChatHistory(userInfo.UserId, query, answer)
-					}
-					contentResp := llm.ChatStream{
-						Type: llm.CHAT_TYPE_TOKENS,
-						Body: tokens,
-					}
-					v, _ := json.Marshal(contentResp)
-					msgListener <- string(v)
-				}(curUser, string(msgData["room"]), string(msgData["input"]))
+				if _, ok := msgData["history"]; ok {
+					dealChatHistory(curUser, msgData, msgListener)
+				} else if _, ok := msgData["input"]; ok {
+					dealChatRequest(curUser, msgData, msgListener)
+				} else {
+					close(msgListener)
+				}
 				for respMsg := range msgListener {
 					logger.Infof("send to browser:%s", respMsg)
 
 					c.WriteMessage(mt, []byte(respMsg))
 				}
+
 				//maybe close
 				break
 			}
@@ -141,8 +222,17 @@ func Chat(c *gin.Context) {
 		})
 		return
 	}
+
+	engine := &ChatEngine{
+		SearchEngine: &searchengineapi.LocalSearchEngine{},
+		Prompt: &llm.TravelPrompt{
+			MaxLength:    1024,
+			PromptPrefix: conf.GlobalConfig.SparkLLM.TravelPrompt,
+		},
+		Model: &spark.SparkModel{},
+	}
 	//logger.WithField("req", c.GetString(gin.BodyBytesKey)).Info("request chat ")
-	resp, tokens := LLMChat(req.Query)
+	resp, tokens := engine.LLMChat(req.Query)
 	logger.WithField("req", c.GetString(gin.BodyBytesKey)).WithField("chat", resp).Info("request chat")
 	c.JSON(http.StatusOK, gin.H{
 		"chat":        resp,
@@ -157,5 +247,7 @@ func Home(c *gin.Context) {
 }
 
 func Index(c *gin.Context) {
-	c.Redirect(http.StatusFound, "/index.html")
+	c.HTML(http.StatusOK, "index.html", gin.H{
+		"server": template.JSEscapeString(conf.GlobalConfig.ChatAddr),
+	})
 }

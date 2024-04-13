@@ -1,190 +1,80 @@
 package search
 
 import (
+	"context"
 	"encoding/json"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 	"travel_ai_search/search/conf"
-	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/llm"
-	"travel_ai_search/search/llm/spark"
-	"travel_ai_search/search/modelclient"
-	"travel_ai_search/search/qdrant"
+	searchengineapi "travel_ai_search/search/search_engine_api"
 
 	logger "github.com/sirupsen/logrus"
 	"github.com/tmc/langchaingo/schema"
 )
 
-func SearchCandidate(query string, threshold float32) ([]map[string]string, error) {
-	vectors, err := modelclient.GetInstance().QueryEmbedding([]string{query})
+type ChatEngine struct {
+	Room         string
+	SearchEngine searchengineapi.SearchEngine
+	Prompt       llm.Prompt
+	Model        llm.GenModel
+}
+
+func (engine *ChatEngine) LLMChatPrompt(query string) (string, error) {
+	candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
 	if err != nil {
-		logger.Errorf("query embedding err:%s", err)
-		return nil, err
+		return conf.ErrHint, err
 	}
 
-	scores, err := qdrant.GetInstance().Search(qdrant.DETAIL_COLLECTION,
-		vectors[0], uint64(conf.GlobalConfig.MaxCandidates), false, true)
-	if err != nil {
-		logger.Errorf("{%s},search err:%s", query, err)
-		return nil, err
+	if len(candidates) == 0 {
+		return conf.EmptyHint, err
 	}
-
-	sort.Slice(scores, func(i, j int) bool {
-		return scores[i].GetScore() < scores[j].GetScore()
-	})
-
-	keys := make([]string, 0, len(scores))
-	for i := len(scores) - 1; i >= 0; i-- {
-		scoreNode := scores[i]
-		logger.WithField("query", query).Infof("score:%f,key:%s", scoreNode.GetScore(), scoreNode.GetPayload()["id"].GetStringValue())
-		if threshold > scoreNode.GetScore() {
-			continue
-		}
-		keys = append(keys, scoreNode.GetPayload()["id"].GetStringValue())
-	}
-
-	if len(keys) == 0 {
-		return make([]map[string]string, 0), nil
-	}
-
-	details := make([]map[string]string, 0, len(keys))
-	for _, key := range keys {
-		detail, err := kvclient.GetInstance().HGetAll(key)
-		if err != nil {
-			logger.WithField("key", key).Error("fetch detail err", err)
-			continue
-		}
-		details = append(details, detail)
-	}
-
-	return details, nil
-
+	prompt, err := engine.Prompt.GenPrompt(candidates)
+	return prompt, err
 }
 
-func TravelPrompt(candidates []map[string]string) string {
-	//todo:截断
-	buf := strings.Builder{}
-	buf.WriteString(conf.GlobalConfig.SparkLLM.TravelPrompt)
-	buf.WriteString("\r\n")
-	remain := 1024
-	for ind, detail := range candidates {
-		titleLen := len(detail[conf.DETAIL_TITLE_FIELD])
-		contentLen := len(detail[conf.DETAIL_CONTENT_FIELD])
-		if remain-titleLen > 0 {
-			buf.WriteString("方案" + strconv.Itoa(ind+1) + ":")
-			buf.WriteString("\r\n")
-			buf.WriteString(detail[conf.DETAIL_TITLE_FIELD])
-			remain = remain - titleLen
-		} else {
-			break
-		}
-
-		if remain-contentLen > 0 {
-			buf.WriteString("\r\n")
-			buf.WriteString(detail[conf.DETAIL_CONTENT_FIELD])
-			buf.WriteString("\r\n")
-			remain = remain - contentLen
-		} else {
-			break
-		}
-
-	}
-	buf.WriteString("\r\n")
-	logger.Info(buf.String())
-	return buf.String()
-}
-
-func ChatPrompt(candidates []map[string]string) string {
-	//todo:截断
-	buf := strings.Builder{}
-	buf.WriteString(conf.GlobalConfig.SparkLLM.TravelPrompt)
-	buf.WriteString("\r\n")
-	remain := 1024
-	for ind, detail := range candidates {
-		titleLen := len(detail[conf.DETAIL_TITLE_FIELD])
-		contentLen := len(detail[conf.DETAIL_CONTENT_FIELD])
-		if remain-titleLen > 0 {
-			buf.WriteString("方案" + strconv.Itoa(ind+1) + ":")
-			buf.WriteString("\r\n")
-			buf.WriteString(detail[conf.DETAIL_TITLE_FIELD])
-			remain = remain - titleLen
-		} else {
-			break
-		}
-
-		if remain-contentLen > 0 {
-			buf.WriteString("\r\n")
-			buf.WriteString(detail[conf.DETAIL_CONTENT_FIELD])
-			buf.WriteString("\r\n")
-			remain = remain - contentLen
-		} else {
-			break
-		}
-
-	}
-	buf.WriteString("\r\n")
-	logger.Info(buf.String())
-	return buf.String()
-}
-
-func LLMChatPrompt(query string) string {
-	details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
-	if err != nil {
-		return conf.ErrHint
-	}
-
-	if len(details) == 0 {
-		return conf.EmptyHint
-	}
-	prompt := TravelPrompt(details)
-	return prompt
-}
-
-func LLMChat(query string) (string, int64) {
-	details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
+func (engine *ChatEngine) LLMChat(query string) (string, int64) {
+	candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
 	if err != nil {
 		return conf.ErrHint, 0
 	}
 
-	if len(details) == 0 {
+	if len(candidates) == 0 {
 		return conf.EmptyHint, 0
 	}
-	prompt := TravelPrompt(details)
+	prompt, err := engine.Prompt.GenPrompt(candidates)
+	if err != nil {
+		return conf.ErrHint, 0
+	}
 	systemMsg := schema.SystemChatMessage{
 		Content: prompt,
 	}
 	queryMsg := schema.HumanChatMessage{
 		Content: query,
 	}
-	resp, totalTokens := spark.GetChatRes([]schema.ChatMessage{systemMsg, queryMsg}, nil)
+	resp, totalTokens := engine.Model.GetChatRes([]schema.ChatMessage{systemMsg, queryMsg}, nil)
 	return resp, totalTokens
 
 }
 
-func LLMChatStreamMock(room string, query string, msgListener chan string, chatHistorys []schema.ChatMessage) (string, int64) {
-	var prompt string
-
-	if room == "travel" {
-		details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
-		if err != nil {
-			return conf.ErrHint, 0
-		}
-		// if len(details) == 0 {
-		// 	return conf.EmptyHint, 0
-		// }
-		prompt = TravelPrompt(details)
-		candidateResp := llm.ChatStream{
-			Type: llm.CHAT_TYPE_CANDIDATE,
-			Body: details,
-		}
-		v, _ := json.Marshal(candidateResp)
-		msgListener <- string(v)
-	} else {
-		prompt = conf.GlobalConfig.SparkLLM.ChatPrompt
-		//todo: search engine
+func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan string, chatHistorys []schema.ChatMessage) (string, int64) {
+	candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
+	if err != nil {
+		return conf.ErrHint, 0
 	}
+
+	prompt, err := engine.Prompt.GenPrompt(candidates)
+	if err != nil {
+		return conf.ErrHint, 0
+	}
+	candidateResp := llm.ChatStream{
+		Type: llm.CHAT_TYPE_CANDIDATE,
+		Body: candidates,
+		Room: engine.Room,
+	}
+	v, _ := json.Marshal(candidateResp)
+	msgListener <- string(v)
 
 	//systemMsg := llm.Message{Role: llm.ROLE_SYSTEM, Content: prompt}
 	//queryMsg := llm.Message{Role: llm.ROLE_USER, Content: query}
@@ -216,9 +106,11 @@ func LLMChatStreamMock(room string, query string, msgListener chan string, chatH
 	seqno := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	for _, msg := range msgs {
 		msgResp := llm.ChatStream{
-			Type:  llm.CHAT_TYPE_MSG,
-			Body:  msg.GetContent(),
-			Seqno: seqno,
+			Type:     llm.CHAT_TYPE_MSG,
+			Body:     msg.GetContent(),
+			Room:     engine.Room,
+			ChatType: string(msg.GetType()),
+			Seqno:    seqno,
 		}
 		v, _ := json.Marshal(msgResp)
 		msgListener <- string(v)
@@ -242,9 +134,11 @@ func LLMChatStreamMock(room string, query string, msgListener chan string, chatH
 		txt = strings.ReplaceAll(txt, "\\r\\n", "<br />")
 		txt = strings.ReplaceAll(txt, "\\n", "<br />")
 		msgResp := llm.ChatStream{
-			Type:  llm.CHAT_TYPE_MSG,
-			Body:  txt + "\n",
-			Seqno: seqno,
+			Type:     llm.CHAT_TYPE_MSG,
+			Body:     txt + "\n",
+			Room:     engine.Room,
+			ChatType: string(schema.ChatMessageTypeAI),
+			Seqno:    seqno,
 		}
 		v, _ := json.Marshal(msgResp)
 		msgListener <- string(v)
@@ -253,28 +147,27 @@ func LLMChatStreamMock(room string, query string, msgListener chan string, chatH
 	return "sssss", 10
 }
 
-func LLMChatStream(room string, query string, msgListener chan string, chatHistorys []schema.ChatMessage) (answer string, totalTokens int64) {
-	var prompt string
-	logger.Infof("room:%s,query:%s", room, query)
-	if room == "travel" {
-		details, err := SearchCandidate(query, conf.GlobalConfig.PreRankingThreshold)
-		if err != nil {
-			return conf.ErrHint, 0
-		}
-		if len(details) == 0 {
-			return conf.EmptyHint, 0
-		}
-		prompt = TravelPrompt(details)
-		candidateResp := llm.ChatStream{
-			Type: llm.CHAT_TYPE_CANDIDATE,
-			Body: details,
-		}
-		v, _ := json.Marshal(candidateResp)
-		msgListener <- string(v)
-	} else {
-		prompt = conf.GlobalConfig.SparkLLM.ChatPrompt
-		//todo: search engine
+func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, chatHistorys []schema.ChatMessage) (answer string, totalTokens int64) {
+
+	logger.Infof("query:%s", query)
+
+	candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
+	if err != nil {
+		return conf.ErrHint, 0
 	}
+
+	prompt, err := engine.Prompt.GenPrompt(candidates)
+	if err != nil {
+		return conf.ErrHint, 0
+	}
+	candidateResp := llm.ChatStream{
+		Type: llm.CHAT_TYPE_CANDIDATE,
+		Room: engine.Room,
+		Body: candidates,
+	}
+	v, _ := json.Marshal(candidateResp)
+	msgListener <- string(v)
+
 	systemMsg := schema.SystemChatMessage{
 		Content: prompt,
 	}
@@ -300,7 +193,7 @@ func LLMChatStream(room string, query string, msgListener chan string, chatHisto
 		}
 	}
 	msgs = append(msgs, userMsg)
-	answer, totalTokens = spark.GetChatRes(msgs, msgListener)
+	answer, totalTokens = engine.Model.GetChatRes(msgs, msgListener)
 	entry.WithField("totalTokens", totalTokens).WithField("answer", answer).Info("[chat]")
 	return
 }

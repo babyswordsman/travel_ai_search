@@ -10,15 +10,24 @@
       var chatroom = "travel";
       var my_menu1 = document.getElementById("menu1");
       var my_menu2 = document.getElementById("menu2");
+
+      var travel_output = document.getElementById("travel_output");
+      var chat_output = document.getElementById("chat_output");
+      chat_output.style.display="none";
+
       my_menu1.onclick = function(){
         my_menu2.className="menu hover:bg-gray-200";
         my_menu1.className="cur_menu";
         chatroom = "travel";
+        travel_output.style.display="";
+        chat_output.style.display="none";
       }
       my_menu2.onclick = function(){
         my_menu1.className="menu hover:bg-gray-200";
         my_menu2.className="cur_menu";
         chatroom = "chat";
+        travel_output.style.display="none";
+        chat_output.style.display="";
       }
 
       var mysubstr = function(str,len){
@@ -28,26 +37,31 @@
         return str
       }
 
-        var output = document.getElementById("output");
+        
         var input = document.getElementById("input");
         var ws;
         ws = null;
-        var print = function(message) {
+        var initTravelRoom = false;
+        var initChatRoom = false;
+
+        var print = function(cur_room,message) {
             var d = document.createElement("div");
             d.className="content"
             d.textContent = message;
+            var output = document.getElementById(cur_room+"_output");
             output.appendChild(d);
             output.scroll(0, output.scrollHeight);
         };
 
-        var printHTML = function(inner_html){
+        var printHTML = function(cur_room,inner_html){
           var d = document.createElement("div");
             d.innerHTML=inner_html;
+            var output = document.getElementById(cur_room+"_output");
             output.appendChild(d);
             output.scroll(0, output.scrollHeight);
         }
     
-        var printCandidate = function(details) {
+        var printCandidate = function(cur_room,details) {
             if(details.length <=0){
               return false;
             }
@@ -58,19 +72,27 @@
               candidate.className="w-96  h-40 min-w-96 min-h-40 border overflow-y-auto  m-2 border-gray-200 ";
               var title = document.createElement("div");
               title.className = "w-[370px] pl-2 font-bold text-xl text-left ";
-              title.textContent=mysubstr(details[i].title,16);
+              if(details[i].link.length > 0){
+                title.innerHTML="<a href=\""+details[i].link+"\" target=\"_blank\">"+mysubstr(details[i].title,16)+"<a>";
+              }else{
+                title.textContent=mysubstr(details[i].title,16);
+              }
+              
+              
               var cont = document.createElement("div");
               cont.className="w-[370px]  text-left pl-2  h-32 ";
-              cont.textContent = mysubstr(details[i].content,154);
+              cont.textContent = mysubstr(details[i].snippet,154);
               candidate.appendChild(title);
               candidate.appendChild(cont);
               d.appendChild(candidate);  
             }
+            var output = document.getElementById(cur_room+"_output");
             output.appendChild(d);
             output.scroll(0, output.scrollHeight);
         };
     
         document.getElementById("clean").onclick = function(evt) {
+            var output = document.getElementById(chatroom+"_output");
             output.innerHTML="";
         }
     
@@ -85,19 +107,26 @@
                 }
                 
             }
-            ws = new WebSocket("ws://127.0.0.1:8081/llm/chat/stream");
+            ws = new WebSocket("ws://localhost.sangfor.com.cn:8081/chat/stream");
             ws.onopen = function(evt) {
                 //print("******已链接....******");
-                
+                if(!initTravelRoom){
+                  ws.send("{\"room\":\"travel\",\"history\":\"history\"}");
+                  initTravelRoom = true;
+                }
+                if(!initChatRoom){
+                  ws.send("{\"room\":\"chat\",\"history\":\"history\"}");
+                  initChatRoom = true;
+                }
                 if(input.value != ""){
-                    printHTML("<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>"+input.value+"</div>");
+                    printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>"+input.value+"</div>");
                     ws.send("{\"room\":\""+chatroom+"\",\"input\":\""+input.value+"\"}");
                     input.value="";
                 }
     
             }
             ws.onclose = function(evt) {
-                printHTML("<div class=\"border-b-2 border-gray-500 m-4\"></div>");
+                printHTML(chatroom,"<div class=\"border-b-2 border-gray-500 m-4\"></div>");
                 document.getElementById("send").disabled = false;
                 ws = null;
             }
@@ -105,35 +134,38 @@
                 //alert(evt.data)
                 var msg = JSON.parse(evt.data)
                 if(msg.type=="candidate"){
-                    printCandidate(msg.body);
+                    printCandidate(msg.room,msg.body);
                 }else if(msg.type=="msg"){
                     var msg_div = document.getElementById("msg_"+msg.seqno);
                     if(msg_div == null){
                       msg_div = document.createElement("div");
                       msg_div.id = "msg_"+msg.seqno;
+                      msg_div.innerHTML=msg.body;
                       msg_div.className = "text-left border-1 mt-2 bg-gray-100 rounded  p-2";
+                      var output = document.getElementById(msg.room+"_output");
                       output.appendChild(msg_div);
                       output.scroll(0, output.scrollHeight);
                     }else{
                       msg_div.innerHTML+=msg.body;
+                      var output = document.getElementById(msg.room+"_output");
                       output.scroll(0, output.scrollHeight);
                     }
                     //print("" + msg.body);
                 }else if(msg.type=="tokens"){
                     //print();
-                    printHTML("<div class=\"border-b-2 border-gray-500 m-4\">[tokens:] "+ msg.body+"</div>");
-                    printHTML("<div class=\"border-b-2 border-gray-500 m-4\"></div>");
+                    printHTML(msg.room,"<div class=\"border-b-2 border-gray-500 m-4\">[tokens:] "+ msg.body+"</div>");
+                    printHTML(msg.room,"<div class=\"border-b-2 border-gray-500 m-4\"></div>");
                     document.getElementById("send").disabled = false;
                 }else{
                     //print("[unknown]" + evt.data);
-                    printHTML("<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>err</div>");
+                    printHTML(msg.room,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>err</div>");
                 }
                 
               
             }
             ws.onerror = function(evt) {
                 //print("ERROR: " + evt.data);
-                printHTML("<div class=\"border-b-2 border-gray-500 m-4\"></div>");
+                printHTML(chatroom,"<div class=\"border-b-2 border-gray-500 m-4\"></div>");
                 ws.close();
             }
             return false;
@@ -150,24 +182,28 @@
                 //print("======链接服务器中...=====");
             }else if(ws.readyState == WebSocket.OPEN){
                 if(input.value != ""){
-                    printHTML("<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>"+input.value+"</div>");
+                    printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>"+input.value+"</div>");
                     ws.send("{\"room\":\""+chatroom+"\",\"input\":\""+input.value+"\"}");
                     input.value="";
                 }
             }else{
-                printHTML("<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>请重新发送</div>");
+                printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>请重新发送</div>");
                 document.getElementById("send").disabled = false;
             }
             return false;
         };
         document.getElementById("close").onclick = function(evt) {
-            printHTML("<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>中断</div>");
+            printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>中断</div>");
             if (!ws) {
                 return false;
             }
             ws.close();
             return false;
         };
+
+
+        //发起查询
+        checkWebSocket();
     });
     </script>
 </head>
@@ -182,29 +218,10 @@
     </div>
     <div class="h-screen border-4 w-3/4 flex flex-col">
       <!-- 上边区域 -->
-      <div id="output"  class=" border-2 flex-1 bg-gray-50 border-gray-100 rounded p-10  overflow-auto ">
-          <!-- div id="output" class="block " -->
-            <!-- <div class="text-left border-1 mt-2 bg-gray-100 rounded  p-2">你说什么</div> -->
-            <!--参考页面-->
-            <!--
-            <div class="flex flex-nowrap overflow-x-auto  mt-2">
-              <div class="w-96  h-40 min-w-96 min-h-40 border  m-2 border-red-400 ">
-                <p>title:sfsfsfs</p>
-                <p>正文</p>
-              </div>
-              
-
-            </div>
-          -->
-            <!--参考页面结束-->  
-          <!--
-            <div class="text-left border-1 mt-2 bg-gray-100 rounded  p-2">
-              大段文字
-            </div>
-          -->
-          <!--/div -->
-          <!-- <div class="border-b-2 border-gray-500 m-4"></div> -->
-          <!----------->   
+      <div id="travel_output"  class=" border-2 flex-1 bg-gray-50 border-gray-100 rounded p-10  overflow-auto ">
+          
+      </div>
+      <div id="chat_output"  class=" border-2 flex-1 bg-gray-50 border-gray-100 rounded p-10  overflow-auto ">
           
       </div>
       <!-- 下边区域，高度固定为 50px -->

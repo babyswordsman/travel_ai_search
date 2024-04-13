@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 	"travel_ai_search/search/common"
@@ -26,20 +27,32 @@ var CHAT_TYPE_TOKENS = "tokens"
 var CHAT_TYPE_MSG = "msg"
 
 type ChatStream struct {
-	Type  string      `json:"type"`
-	Body  interface{} `json:"body"`
-	Seqno string      `json:"seqno"`
+	Type     string      `json:"type"`
+	Body     interface{} `json:"body"`
+	Seqno    string      `json:"seqno"`
+	Room     string      `json:"room"`
+	ChatType string      `json:"chat_type"`
+}
+
+type GenModel interface {
+	/**
+	messages:包含历史信息、当前prompt、用户问题
+	msgListener:大模型流式返回的时候,流式返回给前端的chan
+	return string:大模型全部的生成内容；int64：本次消耗的tokens
+	*/
+	GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string, int64)
 }
 
 type UserChatHistory struct {
+	Room     string
 	Lasttime time.Time
 	ChatBuff *memory.ConversationWindowBuffer
 }
 
 var userChatHistorys = &sync.Map{}
 
-func AddChatHistory(userId string, query, response string) error {
-	v, ok := userChatHistorys.LoadOrStore(userId, &UserChatHistory{})
+func AddChatHistory(userId string, room string, query, response string) error {
+	v, ok := userChatHistorys.LoadOrStore(fmt.Sprintf("%s-%s", room, userId), &UserChatHistory{})
 	history := v.(*UserChatHistory)
 	if !ok {
 		history.ChatBuff = memory.NewConversationWindowBuffer(5,
@@ -61,11 +74,11 @@ func AddChatHistory(userId string, query, response string) error {
 *
 加载用户对话记录
 */
-func LoadChatHistory(userId string) []schema.ChatMessage {
+func LoadChatHistory(userId string, room string) []schema.ChatMessage {
 	if userId == user.EmpytUser.UserId {
 		return make([]schema.ChatMessage, 0)
 	}
-	v, ok := userChatHistorys.Load(userId)
+	v, ok := userChatHistorys.Load(fmt.Sprintf("%s-%s", room, userId))
 	if !ok {
 		return make([]schema.ChatMessage, 0)
 	}
@@ -87,7 +100,7 @@ func LoadChatHistory(userId string) []schema.ChatMessage {
 func InitUserChatHistory() {
 
 	go func() {
-		tick := time.NewTicker(time.Minute)
+		tick := time.NewTicker(time.Minute * 5)
 		for {
 			select {
 			case v := <-tick.C:

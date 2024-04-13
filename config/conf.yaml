@@ -33,3 +33,10 @@ spark_llm:
     您会分析下面的背景信息是否与用户问题相关，如果相关请仔细思考，基于背景信息进行回答，如果不相关请忽略相关背景信息。
     当问题没有直接答案时，请先总结基本规律再回答。
     ###\r\n
+google_custom_search: 
+  key: *
+  cx: *
+  url: https://www.googleapis.com/customsearch/v1
+  hl: zh-CN
+  lr: lang_zh-TW|lang_zh-CN
+  cr: countryCN

@@ -8,20 +8,20 @@ import (
 
 func TestChatHistoryBuff(t *testing.T) {
 	userId := "aaaaa"
+	room := "chat"
+	AddChatHistory(userId, room, "我是谁", "你是张三1")
+	AddChatHistory(userId, room, "我是谁", "你是李四2")
 
-	AddChatHistory(userId, "我是谁", "你是张三1")
-	AddChatHistory(userId, "我是谁", "你是李四2")
-
-	msgs := LoadChatHistory(userId)
+	msgs := LoadChatHistory(userId, room)
 
 	if len(msgs) != 4 {
 		t.Fatalf("expect:%d,actual:%d", 4, len(msgs))
 	}
-	AddChatHistory(userId, "我是谁", "你是张三3")
-	AddChatHistory(userId, "我是谁", "你是李四4")
-	AddChatHistory(userId, "我是谁", "你是张三5")
-	AddChatHistory(userId, "我是谁", "你是李四6")
-	msgs = LoadChatHistory(userId)
+	AddChatHistory(userId, room, "我是谁", "你是张三3")
+	AddChatHistory(userId, room, "我是谁", "你是李四4")
+	AddChatHistory(userId, room, "我是谁", "你是张三5")
+	AddChatHistory(userId, room, "我是谁", "你是李四6")
+	msgs = LoadChatHistory(userId, room)
 	if len(msgs) != 10 {
 		t.Fatalf("expect:%d,actual:%d", 10, len(msgs))
 	}

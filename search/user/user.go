@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json"
 	"time"
 	"travel_ai_search/search/conf"
 
@@ -27,7 +28,13 @@ func GetCurUser(c *gin.Context) User {
 		return EmpytUser
 	} else {
 
-		user := obj.(User)
+		buf := obj.(string)
+		var user User
+		err := json.Unmarshal([]byte(buf), &user)
+		if err != nil {
+			logger.Errorf("Unmarshal {%s} cookie error err:%s", buf, err)
+			session.Delete(conf.GlobalConfig.CookieUser)
+		}
 		logger.Infof("cur user:%s", user.UserId)
 		return user
 	}

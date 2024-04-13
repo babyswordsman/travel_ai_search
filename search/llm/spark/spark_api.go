@@ -25,12 +25,16 @@ import (
 	"github.com/tmc/langchaingo/schema"
 )
 
+type SparkModel struct {
+	Room string
+}
+
 /**
  *  WebAPI 接口调用示例 接口文档（必看）：https://www.xfyun.cn/doc/spark/Web.html
  * 错误码链接：https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html（code返回错误码时必看）
  * @author iflytek
  */
-func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string, int64) {
+func (model *SparkModel) GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string, int64) {
 	// fmt.Println(HmacWithShaTobase64("hmac-sha256", "hello\nhello", "hello"))
 	// st := time.Now()
 	d := websocket.Dialer{
@@ -90,9 +94,10 @@ func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string,
 			fmt.Println("read message error:", err)
 			break
 		}
-
+		logger.Infof("%s", msg)
 		var data map[string]interface{}
 		err1 := json.Unmarshal(msg, &data)
+
 		if err1 != nil {
 			fmt.Println("Error parsing JSON:", err)
 			return "", totalTokens
@@ -121,9 +126,11 @@ func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string,
 				content = strings.ReplaceAll(content, "\r\n", "<br />")
 				content = strings.ReplaceAll(content, "\n", "<br />")
 				contentResp := llm.ChatStream{
-					Type:  llm.CHAT_TYPE_MSG,
-					Body:  content, //strings.ReplaceAll(content, "\n", "<br />"),
-					Seqno: strconv.FormatInt(seqno, 10),
+					ChatType: string(schema.ChatMessageTypeAI),
+					Room:     model.Room,
+					Type:     llm.CHAT_TYPE_MSG,
+					Body:     content, //strings.ReplaceAll(content, "\n", "<br />"),
+					Seqno:    strconv.FormatInt(seqno, 10),
 				}
 				v, _ := json.Marshal(contentResp)
 				msgListener <- string(v)
@@ -136,9 +143,11 @@ func GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string,
 				content = strings.ReplaceAll(content, "\r\n", "<br />")
 				content = strings.ReplaceAll(content, "\n", "<br />")
 				contentResp := llm.ChatStream{
-					Type:  llm.CHAT_TYPE_MSG,
-					Body:  content, //strings.ReplaceAll(content, "\n", "<br />"),
-					Seqno: strconv.FormatInt(seqno, 10),
+					ChatType: string(schema.ChatMessageTypeAI),
+					Type:     llm.CHAT_TYPE_MSG,
+					Room:     model.Room,
+					Body:     content, //strings.ReplaceAll(content, "\n", "<br />"),
+					Seqno:    strconv.FormatInt(seqno, 10),
 				}
 				v, _ := json.Marshal(contentResp)
 				msgListener <- string(v)

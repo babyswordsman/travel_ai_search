@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"travel_ai_search/search"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/kvclient"
+	"travel_ai_search/search/llm"
 	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/qdrant"
 	"travel_ai_search/search/user"
@@ -21,6 +23,7 @@ import (
 )
 
 func CheckSign(c *gin.Context) {
+	logger.Infof("start check sign status")
 	session := sessions.DefaultMany(c, conf.GlobalConfig.CookieSession)
 	obj := session.Get(conf.GlobalConfig.CookieUser)
 	if obj == nil {
@@ -36,13 +39,27 @@ func CheckSign(c *gin.Context) {
 			UserId:   id.String(),
 			Lasttime: time.Now(),
 		}
-		session.Set(conf.GlobalConfig.CookieUser, user)
+		buf, _ := json.Marshal(user)
+		session.Set(conf.GlobalConfig.CookieUser, string(buf))
+		session.Options(sessions.Options{
+			Path: "/",
+
+			MaxAge:   3600 * 24 * 30,
+			Secure:   false,
+			HttpOnly: true,
+		})
 		session.Save()
 		logger.Infof("add new user:%s", user.UserId)
 		c.Next()
 	} else {
 
-		user := obj.(user.User)
+		buf := obj.(string)
+		var user user.User
+		err := json.Unmarshal([]byte(buf), &user)
+		if err != nil {
+			logger.Errorf("Unmarshal {%s} cookie error err:%s", buf, err)
+			session.Delete(conf.GlobalConfig.CookieUser)
+		}
 		logger.Infof("user:%s,lasttime:%s", user.UserId, user.Lasttime.Format("2006-01-02 15:04:05"))
 		user.Lasttime = time.Now()
 		//session.Save()
@@ -58,13 +75,15 @@ func init_router(r *gin.Engine) {
 		manage_route.GET("/init_data", search.InitData)
 	}
 
-	chat_route := r.Group("llm")
 	store := cookie.NewStore([]byte(conf.GlobalConfig.CookieCodeKey))
-	store.Options(sessions.Options{
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   3600 * 24 * 30,
-	})
+
+	// store.Options(sessions.Options{
+	// 	Path:     "/",
+	// 	HttpOnly: true,
+	// 	MaxAge:   3600 * 24 * 30,
+	// })
+
+	chat_route := r.Group("/")
 	chat_route.Use(sessions.SessionsMany([]string{conf.GlobalConfig.CookieSession}, store), CheckSign)
 	{
 
@@ -72,7 +91,7 @@ func init_router(r *gin.Engine) {
 		chat_route.POST("/chat", search.Chat)
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)
-
+		chat_route.GET("/", search.Index)
 	}
 }
 
@@ -122,12 +141,15 @@ func main() {
 	defer tmpModelClient.Close()
 	logger.WithFields(logger.Fields{"embedding": config.EmbeddingModelHost,
 		"reranker": config.RerankerModelHost}).Info("model client init")
+	//用户历史清理
+	llm.InitUserChatHistory()
 
 	//启动对外服务接口
 	r := gin.Default()
-	r.LoadHTMLGlob("resource/*.tmpl")
+	//r.LoadHTMLGlob("resource/*.tmpl")
+	r.LoadHTMLFiles("resource/chat.tmpl", "resource/web/index.html")
 	r.StaticFile("/output.css", "./resource/web/output.css")
-	r.StaticFile("/", "./resource/web/index.html")
+	//r.StaticFile("/index.html", "./resource/web/index.html")
 	init_router(r)
 	logger.Info("start gin: ", config.ServerAddr)
 	r.Run(config.ServerAddr)
