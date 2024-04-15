@@ -155,6 +155,7 @@ func dealChatHistory(curUser user.User, msgData map[string]string, msgListener c
 
 func ChatStream(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
+	chatUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	c, err := chatUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Errorf("chat upgrade:%s", err)
