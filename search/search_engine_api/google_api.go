@@ -12,19 +12,18 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-type GoogleSearchEngine struct{
-
+type GoogleSearchEngine struct {
 }
 
 func (engine *GoogleSearchEngine) Search(ctx context.Context, config *conf.Config, query string) ([]SearchItem, error) {
-	return engine.googleSearch(ctx,config,query)
+	return engine.googleSearch(ctx, config, query)
 }
 
 type GoogleSearchResponse struct {
 	Items []SearchItem `json:"items"`
 }
 
-func (engine *GoogleSearchEngine)googleSearch(ctx context.Context, config *conf.Config, query string) ([]SearchItem, error) {
+func (engine *GoogleSearchEngine) googleSearch(ctx context.Context, config *conf.Config, query string) ([]SearchItem, error) {
 	queries := make(url.Values)
 	queries.Add("hl", config.GoogleCustomSearch.Hl)
 	queries.Add("lr", config.GoogleCustomSearch.Lr)
@@ -33,8 +32,10 @@ func (engine *GoogleSearchEngine)googleSearch(ctx context.Context, config *conf.
 
 	logger.Infof("google search query:%s?%s", config.GoogleCustomSearch.Url, queries.Encode())
 	//日志不要打印cx和key的值
-	queries.Add("cx", config.GoogleCustomSearch.Appid)
-	queries.Add("key", config.GoogleCustomSearch.Key)
+	if !config.GoogleCustomSearch.IsProxy {
+		queries.Add("cx", config.GoogleCustomSearch.Appid)
+		queries.Add("key", config.GoogleCustomSearch.Key)
+	}
 
 	reqURL := fmt.Sprintf("%s?%s", config.GoogleCustomSearch.Url, queries.Encode())
 	response, err := http.Get(reqURL)

@@ -40,3 +40,4 @@ google_custom_search:
   hl: zh-CN
   lr: lang_zh-TW|lang_zh-CN
   cr: countryCN
+  is_proxy: true

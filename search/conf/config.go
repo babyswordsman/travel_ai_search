@@ -11,12 +11,13 @@ type SparkLLM struct {
 }
 
 type GoogleCustomSearch struct {
-	Key   string `yaml:"key"`
-	Appid string `yaml:"cx"`
-	Url   string `yaml:"url"`
-	Hl    string `yaml:"hl"`
-	Lr    string `yaml:"lr"`
-	Cr    string `yaml:"cr"`
+	Key     string `yaml:"key"`
+	Appid   string `yaml:"cx"`
+	Url     string `yaml:"url"`
+	Hl      string `yaml:"hl"`
+	Lr      string `yaml:"lr"`
+	Cr      string `yaml:"cr"`
+	IsProxy bool   `yaml:"is_proxy"`
 }
 
 type Config struct {
