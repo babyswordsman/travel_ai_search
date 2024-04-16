@@ -107,7 +107,8 @@
                 }
                 
             }
-            ws = new WebSocket("ws://llm-search.com/chat/stream");
+            ws = new WebSocket("ws://{{.chat_server}}/chat/stream");
+            //ws.setRequestHeader("Cookie", "{{.cookie_key}}={{.cookie_value}}");
             ws.onopen = function(evt) {
                 //print("******已链接....******");
                 if(!initTravelRoom){

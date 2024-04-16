@@ -34,6 +34,7 @@ func GetCurUser(c *gin.Context) User {
 		if err != nil {
 			logger.Errorf("Unmarshal {%s} cookie error err:%s", buf, err)
 			session.Delete(conf.GlobalConfig.CookieUser)
+			return EmpytUser
 		}
 		logger.Infof("cur user:%s", user.UserId)
 		return user

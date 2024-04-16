@@ -254,7 +254,13 @@ func Home(c *gin.Context) {
 }
 
 func Index(c *gin.Context) {
+	cookie, err := c.Cookie(conf.GlobalConfig.CookieSession)
+	if err != nil {
+		cookie=""
+	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
-		"server": template.JSEscapeString(conf.GlobalConfig.ChatAddr),
+		"chat_server":  template.JSEscapeString(conf.GlobalConfig.ChatAddr),
+		"cookie_key":   conf.GlobalConfig.CookieSession,
+		"cookie_value": cookie,
 	})
 }
