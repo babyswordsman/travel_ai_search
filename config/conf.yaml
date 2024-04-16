@@ -1,5 +1,5 @@
 server_addr: 0.0.0.0:8081
-chat_addr: ws://127.0.0.1:8081/llm/chat/stream
+chat_addr: 127.0.0.1:8081
 cookie_code_key: ***
 cookie_session: cookie_sess
 cookie_user: ai_search_user
