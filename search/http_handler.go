@@ -110,13 +110,13 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			Room:         room,
 		}
 		if conf.GlobalConfig.SparkLLM.IsMock {
-			answer, tokens = engine.LLMChatStreamMock(query, msgListener, llm.LoadChatHistory(userInfo.UserId, room))
+			answer, tokens = engine.LLMChatStreamMock(query, msgListener, llm.GetHistoryStoreInstance().LoadChatHistoryForLLM(userInfo.UserId, room))
 
 		} else {
-			answer, tokens = engine.LLMChatStream(query, msgListener, llm.LoadChatHistory(userInfo.UserId, room))
+			answer, tokens = engine.LLMChatStream(query, msgListener, llm.GetHistoryStoreInstance().LoadChatHistoryForLLM(userInfo.UserId, room))
 		}
 		if answer != "" {
-			llm.AddChatHistory(userInfo.UserId, room, query, answer)
+			llm.GetHistoryStoreInstance().AddChatHistory(userInfo.UserId, room, query, answer)
 		}
 		contentResp := llm.ChatStream{
 			ChatType: string(schema.ChatMessageTypeAI),
@@ -135,7 +135,7 @@ func dealChatHistory(curUser user.User, msgData map[string]string, msgListener c
 		close(msgListener)
 	}()
 	room := msgData["room"]
-	msgs := llm.LoadChatHistory(curUser.UserId, room)
+	msgs := llm.GetHistoryStoreInstance().LoadChatHistoryForHuman(curUser.UserId, room)
 	seqno := time.Now().UnixNano()
 	for i, msg := range msgs {
 		contentResp := llm.ChatStream{
@@ -256,7 +256,7 @@ func Home(c *gin.Context) {
 func Index(c *gin.Context) {
 	cookie, err := c.Cookie(conf.GlobalConfig.CookieSession)
 	if err != nil {
-		cookie=""
+		cookie = ""
 	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"chat_server":  template.JSEscapeString(conf.GlobalConfig.ChatAddr),

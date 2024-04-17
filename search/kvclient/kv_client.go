@@ -74,3 +74,18 @@ func (client *KVClient) HGetAll(key string) (map[string]string, error) {
 	}
 	return val, err
 }
+
+func (client *KVClient) LPush(key string, values ...interface{}) error {
+	_, err := client.cli.LPush(client.ctx, key, values...).Result()
+	return err
+}
+
+func (client *KVClient) LTrim(key string, start, stop int64) (string, error) {
+	status, err := client.cli.LTrim(client.ctx, key, start, stop).Result()
+	return status, err
+}
+
+func (client *KVClient) LRange(key string, start, stop int64) ([]string, error) {
+	values, err := client.cli.LRange(client.ctx, key, start, stop).Result()
+	return values, err
+}

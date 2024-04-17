@@ -141,8 +141,10 @@ func main() {
 	defer tmpModelClient.Close()
 	logger.WithFields(logger.Fields{"embedding": config.EmbeddingModelHost,
 		"reranker": config.RerankerModelHost}).Info("model client init")
+	//llm.InitMemHistoryStoreInstance(5)
+	llm.InitKVHistoryStoreInstance(kvclient.GetInstance(), 10)
 	//用户历史清理
-	llm.InitUserChatHistory()
+	llm.GetHistoryStoreInstance().StarCleanTask()
 
 	//启动对外服务接口
 	r := gin.Default()
