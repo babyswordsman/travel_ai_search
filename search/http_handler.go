@@ -135,9 +135,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 
 func dealChatHistory(curUser user.User, msgData map[string]string, msgListener chan string) {
 	//用户历史没有区分频道
-	defer func() {
-		close(msgListener)
-	}()
+
 	room := msgData["room"]
 	msgs := llm.GetHistoryStoreInstance().LoadChatHistoryForHuman(curUser.UserId, room)
 	seqno := time.Now().UnixNano()
@@ -176,6 +174,21 @@ func ChatStream(ctx *gin.Context) {
 
 	curUser := user.GetCurUser(ctx)
 
+	msgListener := make(chan string, 10)
+	defer close(msgListener)
+
+	go func() {
+		for respMsg := range msgListener {
+			logger.Infof("send to browser:%s", respMsg)
+
+			err := c.WriteMessage(websocket.TextMessage, []byte(respMsg))
+			if err != nil {
+				logger.Errorf("write message err:%s", err)
+				break
+			}
+		}
+	}()
+
 	for {
 		mt, message, err := c.ReadMessage()
 		if err != nil {
@@ -183,7 +196,7 @@ func ChatStream(ctx *gin.Context) {
 			break
 		}
 		//ping pong close已经由框架代理了
-		//暂时只支持单轮
+
 		switch mt {
 		case websocket.TextMessage:
 			{
@@ -195,22 +208,13 @@ func ChatStream(ctx *gin.Context) {
 					break
 				}
 
-				msgListener := make(chan string, 10)
-
 				if _, ok := msgData["history"]; ok {
+					//阻塞式
 					dealChatHistory(curUser, msgData, msgListener)
 				} else if _, ok := msgData["input"]; ok {
 					dealChatRequest(curUser, msgData, msgListener)
-				} else {
-					close(msgListener)
-				}
-				for respMsg := range msgListener {
-					logger.Infof("send to browser:%s", respMsg)
-
-					c.WriteMessage(mt, []byte(respMsg))
 				}
 
-				//maybe close
 				break
 			}
 		default:
