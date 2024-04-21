@@ -1,5 +1,12 @@
 package conf
 
+import (
+	"fmt"
+	"os"
+
+	yaml "gopkg.in/yaml.v3"
+)
+
 type SparkLLM struct {
 	HostUrl      string `yaml:"host_url"`
 	Appid        string `yaml:"appid"`
@@ -18,6 +25,11 @@ type GoogleCustomSearch struct {
 	Lr      string `yaml:"lr"`
 	Cr      string `yaml:"cr"`
 	IsProxy bool   `yaml:"is_proxy"`
+}
+
+type OpenSerpSearch struct {
+	Url     string   `yaml:"url"`
+	Engines []string `yaml:"engines"`
 }
 
 type Config struct {
@@ -56,6 +68,7 @@ type Config struct {
 	SparkLLM SparkLLM `yaml:"spark_llm"`
 
 	GoogleCustomSearch GoogleCustomSearch `yaml:"google_custom_search"`
+	OpenSerpSearch     OpenSerpSearch     `yaml:"openserp_search"`
 }
 
 var ErrHint = "这个问题，我不知道该怎么回答，我可能需要升级了..."
@@ -65,3 +78,17 @@ var DETAIL_TITLE_FIELD string = "title"
 var DETAIL_CONTENT_FIELD string = "content"
 
 var GlobalConfig *Config
+
+func ParseConfig(configPath string) (*Config, error) {
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+
+		return nil, fmt.Errorf("read file:%s err:%s", configPath, err)
+	}
+	config := &Config{}
+	err = yaml.Unmarshal(content, config)
+	if err != nil {
+		return nil, fmt.Errorf("parse yaml:%s err:%s", configPath, err)
+	}
+	return config, nil
+}

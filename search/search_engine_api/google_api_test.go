@@ -9,23 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 	"travel_ai_search/search/conf"
-
-	yaml "gopkg.in/yaml.v3"
 )
-
-func parseConfig(configPath string) (*conf.Config, error) {
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-
-		return nil, fmt.Errorf("read file:%s err:%s", configPath, err)
-	}
-	config := &conf.Config{}
-	err = yaml.Unmarshal(content, config)
-	if err != nil {
-		return nil, fmt.Errorf("parse yaml:%s err:%s", configPath, err)
-	}
-	return config, nil
-}
 
 var configPath = flag.String("config", "config path", "conf.yaml")
 
@@ -35,7 +19,7 @@ func TestGoogleSearch(t *testing.T) {
 	t.Logf("exe:%s", getExePath())
 	t.Logf("abs:%s", getAbsPath())
 	t.Logf("wdp:%s", getWorkingDirPath())
-	config, err := parseConfig(*configPath)
+	config, err := conf.ParseConfig(*configPath)
 	if err != nil {
 		t.Errorf("path:%s,err:%v", *configPath, err)
 	}

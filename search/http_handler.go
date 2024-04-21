@@ -95,7 +95,11 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 		case "chat":
 			fallthrough
 		default:
-			searchEngine = &searchengineapi.GoogleSearchEngine{}
+			//searchEngine = &searchengineapi.GoogleSearchEngine{}
+			searchEngine = &searchengineapi.OpenSerpSearchEngine{
+				Engines: conf.GlobalConfig.OpenSerpSearch.Engines,
+				BaseUrl: conf.GlobalConfig.OpenSerpSearch.Url,
+			}
 			prompt = &llm.TravelPrompt{
 				MaxLength:    1024,
 				PromptPrefix: conf.GlobalConfig.SparkLLM.ChatPrompt,

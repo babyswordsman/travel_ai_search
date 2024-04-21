@@ -41,3 +41,9 @@ google_custom_search:
   lr: lang_zh-TW|lang_zh-CN
   cr: countryCN
   is_proxy: true
+
+openserp_search:
+  url: http://llm-search.com/openserp/search
+  engines:
+    - google
+    - baidu
