@@ -22,7 +22,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	logger "github.com/sirupsen/logrus"
-	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/llms"
 )
 
 type SparkModel struct {
@@ -34,7 +34,7 @@ type SparkModel struct {
  * 错误码链接：https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html（code返回错误码时必看）
  * @author iflytek
  */
-func (model *SparkModel) GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string, int64) {
+func (model *SparkModel) GetChatRes(messages []llms.ChatMessage, msgListener chan string) (string, int64) {
 	// fmt.Println(HmacWithShaTobase64("hmac-sha256", "hello\nhello", "hello"))
 	// st := time.Now()
 	d := websocket.Dialer{
@@ -68,9 +68,9 @@ func (model *SparkModel) GetChatRes(messages []schema.ChatMessage, msgListener c
 		textLen := 0
 		for _, msg := range messages {
 			switch msg.GetType() {
-			case schema.ChatMessageTypeSystem:
+			case llms.ChatMessageTypeSystem:
 				sparkMsgs = append(sparkMsgs, llm.Message{Role: llm.ROLE_SYSTEM, Content: msg.GetContent()})
-			case schema.ChatMessageTypeHuman:
+			case llms.ChatMessageTypeHuman:
 				sparkMsgs = append(sparkMsgs, llm.Message{Role: llm.ROLE_USER, Content: msg.GetContent()})
 			default:
 				sparkMsgs = append(sparkMsgs, llm.Message{Role: llm.ROLE_ASSISTANT, Content: msg.GetContent()})
@@ -126,7 +126,7 @@ func (model *SparkModel) GetChatRes(messages []schema.ChatMessage, msgListener c
 				content = strings.ReplaceAll(content, "\r\n", "<br />")
 				content = strings.ReplaceAll(content, "\n", "<br />")
 				contentResp := llm.ChatStream{
-					ChatType: string(schema.ChatMessageTypeAI),
+					ChatType: string(llms.ChatMessageTypeAI),
 					Room:     model.Room,
 					Type:     llm.CHAT_TYPE_MSG,
 					Body:     content, //strings.ReplaceAll(content, "\n", "<br />"),
@@ -143,7 +143,7 @@ func (model *SparkModel) GetChatRes(messages []schema.ChatMessage, msgListener c
 				content = strings.ReplaceAll(content, "\r\n", "<br />")
 				content = strings.ReplaceAll(content, "\n", "<br />")
 				contentResp := llm.ChatStream{
-					ChatType: string(schema.ChatMessageTypeAI),
+					ChatType: string(llms.ChatMessageTypeAI),
 					Type:     llm.CHAT_TYPE_MSG,
 					Room:     model.Room,
 					Body:     content, //strings.ReplaceAll(content, "\n", "<br />"),

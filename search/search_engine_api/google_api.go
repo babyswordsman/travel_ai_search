@@ -54,6 +54,9 @@ func (engine *GoogleSearchEngine) googleSearch(ctx context.Context, config *conf
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("unmarshal google search response: %s", err)
 	}
-
+	for i:=0;i<len(resp.Items);i++{
+		resp.Items[i].IsSearch = true
+		resp.Items[i].Score = 0.0
+	}
 	return resp.Items, nil
 }

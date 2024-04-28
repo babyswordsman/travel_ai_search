@@ -7,7 +7,7 @@ import (
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/kvclient"
 
-	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/llms"
 )
 
 func TestKVChatHistoryStore(t *testing.T) {
@@ -39,11 +39,11 @@ func TestKVChatHistoryStore(t *testing.T) {
 	t.Logf("actual:%s,%s,expected:%s,%s", msg0.GetContent(), msg0.GetType(), "答案19", "ai")
 	t.Logf("actual:%s,%s,expected:%s,%s", msg1.GetContent(), msg1.GetType(), "问题19", "human")
 
-	if msg1.GetContent() != "答案19" && msg1.GetType() != schema.ChatMessageTypeAI {
+	if msg1.GetContent() != "答案19" && msg1.GetType() != llms.ChatMessageTypeAI {
 		t.Errorf("actual:%s,%s,expected:%s,%s", msg1.GetContent(), msg1.GetType(), "答案19", "ai")
 	}
 
-	if msg0.GetContent() != "问题19" && msg0.GetType() != schema.ChatMessageTypeHuman {
+	if msg0.GetContent() != "问题19" && msg0.GetType() != llms.ChatMessageTypeHuman {
 		t.Errorf("actual:%s,%s,expected:%s,%s", msg0.GetContent(), msg0.GetType(), "问题19", "human")
 	}
 

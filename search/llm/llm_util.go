@@ -1,7 +1,7 @@
 package llm
 
 import (
-	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/llms"
 )
 
 var ROLE_SYSTEM = "system"
@@ -16,16 +16,16 @@ type Message struct {
 }
 
 // GetType gets the type of the message.
-func (msg *Message) GetType() schema.ChatMessageType {
+func (msg *Message) GetType() llms.ChatMessageType {
 	switch msg.Role {
 	case ROLE_SYSTEM:
-		return schema.ChatMessageTypeSystem
+		return llms.ChatMessageTypeSystem
 	case ROLE_ASSISTANT:
-		return schema.ChatMessageTypeAI
+		return llms.ChatMessageTypeAI
 	case ROLE_USER:
-		return schema.ChatMessageTypeHuman
+		return llms.ChatMessageTypeHuman
 	default:
-		return schema.ChatMessageTypeTool
+		return llms.ChatMessageTypeTool
 	}
 }
 
@@ -56,5 +56,5 @@ type GenModel interface {
 	msgListener:大模型流式返回的时候,流式返回给前端的chan
 	return string:大模型全部的生成内容；int64：本次消耗的tokens
 	*/
-	GetChatRes(messages []schema.ChatMessage, msgListener chan string) (string, int64)
+	GetChatRes(messages []llms.ChatMessage, msgListener chan string) (string, int64)
 }

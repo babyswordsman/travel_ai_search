@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 	searchengineapi "travel_ai_search/search/search_engine_api"
 
 	logger "github.com/sirupsen/logrus"
-	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/llms"
 )
 
 type ChatEngine struct {
@@ -30,7 +31,12 @@ func (engine *ChatEngine) LLMChatPrompt(query string) (string, error) {
 	if len(candidates) == 0 {
 		return conf.EmptyHint, err
 	}
-	prompt, err := engine.Prompt.GenPrompt(candidates)
+	
+	docs, err := llm.PreRankDoc(query, candidates)
+	if err != nil {
+		return conf.ErrHint, fmt.Errorf(conf.ErrHint)
+	}
+	prompt, _, err := engine.Prompt.GenPrompt(docs)
 	return prompt, err
 }
 
@@ -43,34 +49,41 @@ func (engine *ChatEngine) LLMChat(query string) (string, int64) {
 	if len(candidates) == 0 {
 		return conf.EmptyHint, 0
 	}
-	prompt, err := engine.Prompt.GenPrompt(candidates)
+	docs, err := llm.PreRankDoc(query, candidates)
 	if err != nil {
 		return conf.ErrHint, 0
 	}
-	systemMsg := schema.SystemChatMessage{
+	prompt, _, err := engine.Prompt.GenPrompt(docs)
+	if err != nil {
+		return conf.ErrHint, 0
+	}
+	systemMsg := llms.SystemChatMessage{
 		Content: prompt,
 	}
-	queryMsg := schema.HumanChatMessage{
+	queryMsg := llms.HumanChatMessage{
 		Content: query,
 	}
-	resp, totalTokens := engine.Model.GetChatRes([]schema.ChatMessage{systemMsg, queryMsg}, nil)
+	resp, totalTokens := engine.Model.GetChatRes([]llms.ChatMessage{systemMsg, queryMsg}, nil)
 	return resp, totalTokens
 
 }
 
-func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan string, chatHistorys []schema.ChatMessage) (string, int64) {
+func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan string, chatHistorys []llms.ChatMessage) (string, int64) {
 	candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
 	if err != nil {
 		return conf.ErrHint, 0
 	}
-
-	prompt, err := engine.Prompt.GenPrompt(candidates)
+	docs, err := llm.PreRankDoc(query, candidates)
+	if err != nil {
+		return conf.ErrHint, 0
+	}
+	prompt, refDocuments, err := engine.Prompt.GenPrompt(docs)
 	if err != nil {
 		return conf.ErrHint, 0
 	}
 	candidateResp := llm.ChatStream{
 		Type: llm.CHAT_TYPE_CANDIDATE,
-		Body: candidates,
+		Body: refDocuments,
 		Room: engine.Room,
 	}
 	v, _ := json.Marshal(candidateResp)
@@ -78,10 +91,10 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 
 	//systemMsg := llm.Message{Role: llm.ROLE_SYSTEM, Content: prompt}
 	//queryMsg := llm.Message{Role: llm.ROLE_USER, Content: query}
-	systemMsg := schema.SystemChatMessage{
+	systemMsg := llms.SystemChatMessage{
 		Content: prompt,
 	}
-	userMsg := schema.HumanChatMessage{
+	userMsg := llms.HumanChatMessage{
 		Content: query,
 	}
 
@@ -89,7 +102,7 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 	contentLength += len(systemMsg.GetContent())
 	contentLength += len(userMsg.GetContent())
 
-	msgs := make([]schema.ChatMessage, 0, len(chatHistorys)+2)
+	msgs := make([]llms.ChatMessage, 0, len(chatHistorys)+2)
 	msgs = append(msgs, systemMsg)
 	//todo: 暂时只接受最长1024的长度，给prompt留了1024，后续再改成限制总长度
 	remain := 1024 - len(userMsg.GetContent())
@@ -137,7 +150,7 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 			Type:     llm.CHAT_TYPE_MSG,
 			Body:     txt + "\n",
 			Room:     engine.Room,
-			ChatType: string(schema.ChatMessageTypeAI),
+			ChatType: string(llms.ChatMessageTypeAI),
 			Seqno:    seqno,
 		}
 		v, _ := json.Marshal(msgResp)
@@ -147,7 +160,7 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 	return "sssss", 10
 }
 
-func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, chatHistorys []schema.ChatMessage) (answer string, totalTokens int64) {
+func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, chatHistorys []llms.ChatMessage) (answer string, totalTokens int64) {
 
 	logger.Infof("query:%s", query)
 
@@ -155,23 +168,26 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 	if err != nil {
 		return conf.ErrHint, 0
 	}
-
-	prompt, err := engine.Prompt.GenPrompt(candidates)
+	docs, err := llm.PreRankDoc(query, candidates)
+	if err != nil {
+		return conf.ErrHint, 0
+	}
+	prompt, refDocuments, err := engine.Prompt.GenPrompt(docs)
 	if err != nil {
 		return conf.ErrHint, 0
 	}
 	candidateResp := llm.ChatStream{
 		Type: llm.CHAT_TYPE_CANDIDATE,
 		Room: engine.Room,
-		Body: candidates,
+		Body: refDocuments,
 	}
 	v, _ := json.Marshal(candidateResp)
 	msgListener <- string(v)
 
-	systemMsg := schema.SystemChatMessage{
+	systemMsg := llms.SystemChatMessage{
 		Content: prompt,
 	}
-	userMsg := schema.HumanChatMessage{
+	userMsg := llms.HumanChatMessage{
 		Content: query,
 	}
 	entry := logger.WithField("query", userMsg).WithField("system", systemMsg)
@@ -180,9 +196,10 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 	contentLength += len(systemMsg.GetContent())
 	contentLength += len(userMsg.GetContent())
 
-	msgs := make([]schema.ChatMessage, 0, len(chatHistorys)+2)
+	msgs := make([]llms.ChatMessage, 0, len(chatHistorys)+2)
 	msgs = append(msgs, systemMsg)
 	//todo: 暂时只接受最长1024的长度，给prompt留了1024，后续再改成限制总长度
+	//需要留意聊天记录的顺序
 	remain := 1024 - len(userMsg.GetContent())
 	for i := len(chatHistorys) - 1; i >= 0; i-- {
 		remain = remain - len(chatHistorys[i].GetContent())

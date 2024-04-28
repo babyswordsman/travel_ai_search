@@ -11,8 +11,8 @@ import (
 	"travel_ai_search/search/user"
 
 	logger "github.com/sirupsen/logrus"
+	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/memory"
-	"github.com/tmc/langchaingo/schema"
 )
 
 //暂时不考虑缓存
@@ -39,8 +39,8 @@ func GetHistoryStoreInstance() ChatHistoryStore {
 
 type ChatHistoryStore interface {
 	AddChatHistory(userId string, room string, query, response string) error
-	LoadChatHistoryForLLM(userId string, room string) []schema.ChatMessage
-	LoadChatHistoryForHuman(userId string, room string) []schema.ChatMessage
+	LoadChatHistoryForLLM(userId string, room string) []llms.ChatMessage
+	LoadChatHistoryForHuman(userId string, room string) []llms.ChatMessage
 	StarCleanTask()
 }
 
@@ -73,31 +73,31 @@ func (store *MemoryChatHistoryStore) AddChatHistory(userId string, room string, 
 *
 加载用户对话记录
 */
-func (store *MemoryChatHistoryStore) LoadChatHistoryForHuman(userId string, room string) []schema.ChatMessage {
+func (store *MemoryChatHistoryStore) LoadChatHistoryForHuman(userId string, room string) []llms.ChatMessage {
 	if userId == user.EmpytUser.UserId {
-		return make([]schema.ChatMessage, 0)
+		return make([]llms.ChatMessage, 0)
 	}
 
 	v, ok := userChatHistorys.Load(GetKey(userId, room))
 	if !ok {
-		return make([]schema.ChatMessage, 0)
+		return make([]llms.ChatMessage, 0)
 	}
 	history := v.(*UserChatHistory)
 	tmp := make(map[string]any)
 	historyMsgs, err := history.ChatBuff.LoadMemoryVariables(context.Background(), tmp)
 	if err != nil {
-		return make([]schema.ChatMessage, 0)
+		return make([]llms.ChatMessage, 0)
 	}
 	v, ok = historyMsgs[history.ChatBuff.MemoryKey]
 	if !ok {
-		return make([]schema.ChatMessage, 0)
+		return make([]llms.ChatMessage, 0)
 	}
 
-	return v.([]schema.ChatMessage)
+	return v.([]llms.ChatMessage)
 
 }
 
-func (store *MemoryChatHistoryStore) LoadChatHistoryForLLM(userId string, room string) []schema.ChatMessage {
+func (store *MemoryChatHistoryStore) LoadChatHistoryForLLM(userId string, room string) []llms.ChatMessage {
 	//todo:LlM maybe reverse
 	return store.LoadChatHistoryForHuman(userId, room)
 }
@@ -178,10 +178,10 @@ func (store *KVChatHistoryStore) AddChatHistory(userId string, room string, quer
 
 	return err
 }
-func (store *KVChatHistoryStore) LoadChatHistoryForLLM(userId string, room string) []schema.ChatMessage {
+func (store *KVChatHistoryStore) LoadChatHistoryForLLM(userId string, room string) []llms.ChatMessage {
 	key := GetKey(userId, room)
 	values, err := store.client.LRange(key, 0, store.maxSize-1)
-	msgs := make([]schema.ChatMessage, 0, len(values)*2+1)
+	msgs := make([]llms.ChatMessage, 0, len(values)*2+1)
 	if err != nil {
 		return msgs
 	}
@@ -199,10 +199,10 @@ func (store *KVChatHistoryStore) LoadChatHistoryForLLM(userId string, room strin
 	return msgs
 }
 
-func (store *KVChatHistoryStore) LoadChatHistoryForHuman(userId string, room string) []schema.ChatMessage {
+func (store *KVChatHistoryStore) LoadChatHistoryForHuman(userId string, room string) []llms.ChatMessage {
 	key := GetKey(userId, room)
 	values, err := store.client.LRange(key, 0, store.maxSize-1)
-	msgs := make([]schema.ChatMessage, 0, len(values)*2+1)
+	msgs := make([]llms.ChatMessage, 0, len(values)*2+1)
 	if err != nil {
 		return msgs
 	}

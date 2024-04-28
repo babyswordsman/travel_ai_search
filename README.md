@@ -1,4 +1,10 @@
 # travel_ai_search
+## 代办事项
+- [ ] 提取网页正文内容
+- [ ] 登录
+- [ ] 多轮对话相关性提取
+- [ ] query 基于LLM转换用户的Query，判断是否需要进行外部检索
+- [ ] 思维链
 
 ```
 apt install python3-pip

@@ -49,7 +49,12 @@ func (engine *OpenSerpSearchEngine) Search(ctx context.Context, config *conf.Con
 	}
 	searchItems := make([]SearchItem, 0, len(resp.Items))
 	for _, item := range resp.Items {
-		searchItems = append(searchItems, SearchItem{Link: item.Url, Snippet: item.Description, Title: item.Title})
+		searchItems = append(searchItems, SearchItem{Link: item.Url,
+			Snippet:  item.Description,
+			Title:    item.Title,
+			IsSearch: true,
+			Score: 0.0,
+		})
 	}
 
 	return searchItems, nil

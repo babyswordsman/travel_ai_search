@@ -36,13 +36,16 @@ func (engine *LocalSearchEngine) internalSearch(query string, threshold float32)
 	})
 
 	keys := make([]string, 0, len(scores))
+	scoreMap := make(map[string]float32)
 	for i := len(scores) - 1; i >= 0; i-- {
 		scoreNode := scores[i]
 		logger.WithField("query", query).Infof("score:%f,key:%s", scoreNode.GetScore(), scoreNode.GetPayload()["id"].GetStringValue())
 		if threshold > scoreNode.GetScore() {
 			continue
 		}
-		keys = append(keys, scoreNode.GetPayload()["id"].GetStringValue())
+		key := scoreNode.GetPayload()["id"].GetStringValue()
+		scoreMap[key] = scoreNode.GetScore()
+		keys = append(keys, key)
 	}
 
 	if len(keys) == 0 {
@@ -56,10 +59,16 @@ func (engine *LocalSearchEngine) internalSearch(query string, threshold float32)
 			logger.WithField("key", key).Error("fetch detail err", err)
 			continue
 		}
+		v, ok := scoreMap[key]
+		if !ok {
+			v = 0.0
+		}
 		item := SearchItem{
-			Title:   detail[conf.DETAIL_TITLE_FIELD],
-			Snippet: detail[conf.DETAIL_CONTENT_FIELD],
-			Link:    "/detail?id=" + key,
+			Title:    detail[conf.DETAIL_TITLE_FIELD],
+			Snippet:  detail[conf.DETAIL_CONTENT_FIELD],
+			Link:     "/detail?id=" + key,
+			Score:    v,
+			IsSearch: false,
 		}
 		details = append(details, item)
 	}

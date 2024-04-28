@@ -18,7 +18,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/gorilla/websocket"
 	logger "github.com/sirupsen/logrus"
-	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/llms"
 )
 
 type ChatRequest struct {
@@ -123,7 +123,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			llm.GetHistoryStoreInstance().AddChatHistory(userInfo.UserId, room, query, answer)
 		}
 		contentResp := llm.ChatStream{
-			ChatType: string(schema.ChatMessageTypeAI),
+			ChatType: string(llms.ChatMessageTypeAI),
 			Room:     room,
 			Type:     llm.CHAT_TYPE_TOKENS,
 			Body:     tokens,
