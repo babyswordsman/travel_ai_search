@@ -27,6 +27,7 @@ func get_header() (header map[string]string) {
 	header["Sec-Fetch-Dest"] = "document"
 	header["Sec-Fetch-Mode"] = "navigate"
 	header["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+	header["Referer"] = "https://www.google.com/"
 	return
 }
 func LoadHtml(url string) ([]schema.Document, error) {

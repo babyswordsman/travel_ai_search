@@ -50,7 +50,7 @@ func PrintChatPrompt(c *gin.Context) {
 		SearchEngine: &searchengineapi.LocalSearchEngine{},
 		Prompt: &llm.TravelPrompt{
 			MaxLength:    1024,
-			PromptPrefix: conf.GlobalConfig.SparkLLM.TravelPrompt,
+			PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
 		},
 		Model: &spark.SparkModel{},
 	}
@@ -89,7 +89,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			searchEngine = &searchengineapi.LocalSearchEngine{}
 			prompt = &llm.TravelPrompt{
 				MaxLength:    1024,
-				PromptPrefix: conf.GlobalConfig.SparkLLM.TravelPrompt,
+				PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
 			}
 			model = &spark.SparkModel{Room: room}
 		case "chat":
@@ -102,7 +102,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			}
 			prompt = &llm.TravelPrompt{
 				MaxLength:    1024,
-				PromptPrefix: conf.GlobalConfig.SparkLLM.ChatPrompt,
+				PromptPrefix: conf.GlobalConfig.PromptTemplate.ChatPrompt,
 			}
 			model = &spark.SparkModel{Room: room}
 		}
@@ -242,7 +242,7 @@ func Chat(c *gin.Context) {
 		SearchEngine: &searchengineapi.LocalSearchEngine{},
 		Prompt: &llm.TravelPrompt{
 			MaxLength:    1024,
-			PromptPrefix: conf.GlobalConfig.SparkLLM.TravelPrompt,
+			PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
 		},
 		Model: &spark.SparkModel{},
 	}

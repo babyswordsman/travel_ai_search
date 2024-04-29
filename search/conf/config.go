@@ -8,13 +8,22 @@ import (
 )
 
 type SparkLLM struct {
-	HostUrl      string `yaml:"host_url"`
-	Appid        string `yaml:"appid"`
-	Secret       string `yaml:"secret"`
-	Key          string `yaml:"key"`
-	ChatPrompt   string `yaml:"chat_prompt"`
-	TravelPrompt string `yaml:"travel_prompt"`
-	IsMock       bool   `yaml:"is_mock"`
+	HostUrl string `yaml:"host_url"`
+	Appid   string `yaml:"appid"`
+	Secret  string `yaml:"secret"`
+	Key     string `yaml:"key"`
+	IsMock  bool   `yaml:"is_mock"`
+}
+
+type PromptTemplate struct {
+	ChatPrompt           string `yaml:"chat_prompt"`
+	TravelPrompt         string `yaml:"travel_prompt"`
+	QueryRewritingPrompt string `yaml:"query_rewriting_prompt"`
+}
+
+type DashScopeLLM struct {
+	Key     string `yaml:"key"`
+	HostUrl string `yaml:"host_url"`
 }
 
 type GoogleCustomSearch struct {
@@ -65,7 +74,9 @@ type Config struct {
 
 	MaxCandidates int32 `yaml:"max_candidates"`
 
-	SparkLLM SparkLLM `yaml:"spark_llm"`
+	SparkLLM       SparkLLM       `yaml:"spark_llm"`
+	DashScopeLLM   DashScopeLLM   `yaml:"dash_scope_llm"`
+	PromptTemplate PromptTemplate `yaml:"prompt_template"`
 
 	GoogleCustomSearch GoogleCustomSearch `yaml:"google_custom_search"`
 	OpenSerpSearch     OpenSerpSearch     `yaml:"openserp_search"`

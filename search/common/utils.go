@@ -3,8 +3,11 @@ package common
 import (
 	"fmt"
 	"math"
+	"os"
 	"path"
+	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func ParseLoginCookie() {
@@ -32,7 +35,6 @@ func Errorf(format string, err error) error {
 
 }
 
-
 func CosineSimilarity(emb1, emb2 []float32) (float32, error) {
 	if len(emb1) != len(emb2) {
 		return 0, fmt.Errorf("emb1 len:%d not equal emb2 len:%d ", len(emb1), len(emb2))
@@ -47,4 +49,28 @@ func CosineSimilarity(emb1, emb2 []float32) (float32, error) {
 	}
 	cos := t1 / (math.Sqrt(t2) * math.Sqrt(t3))
 	return float32(cos), nil
+}
+
+func GetTestConfigPath() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = "/"
+	}
+	if strings.Contains(wd, "/travel_ai_search") {
+		dir := wd
+		file := ""
+		i := 20
+		for ; dir != "" && i >= 0; i-- {
+			for len(dir) > 0 && os.IsPathSeparator(dir[len(dir)-1]) {
+				dir = dir[:len(dir)-1]
+			}
+			dir, file = filepath.Split(dir)
+			if file == "travel_ai_search" {
+				wd = filepath.Join(dir, file)
+				break
+			}
+		}
+	}
+	path := fmt.Sprintf("%s/config/conf_local.yaml", wd)
+	return path
 }

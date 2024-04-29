@@ -22,6 +22,12 @@ spark_llm:
   key: **
   secret: **
   is_mock: false
+
+dash_scope_llm:
+  key: sk-***
+  host_url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+
+prompt_template:
   travel_prompt: |-
     您是一名经验丰富的旅行咨询专家，请您帮中国大陆游客写一份详细的出团通知书，出团通知书包括每天行程、交通情况和注意事项，
     您先规划行程有几天，然后再写出每天游览的景点、交通、食宿等信息，
@@ -33,6 +39,31 @@ spark_llm:
     您会分析下面的背景信息是否与用户问题相关，如果相关请仔细思考，基于背景信息进行回答，如果不相关请忽略相关背景信息。
     当问题没有直接答案时，请先总结基本规律再回答。
     ###\r\n
+
+  query_rewriting_prompt: |-
+    请分析用户的提问是否适合搜索引擎查询，如果适合请直接输出原问题，不合适请输出转换后的查询词，但不能改变原提问的含义，
+    如果用户的问题中涉及到多个子问题，请分别为每个子问题提供一个查询词，
+    切记不要对问题做答，只需要改写问题为适合搜索引擎查询的提问即可！
+    请用json输出，格式为：{"origin_query":"","rewriting_query":[""],"is_need_rewrite":true/false}
+    字段说明：
+    origin_query：string类型,表示用户输入的原问题，请原样输出;
+    rewriting_query：string数组类型，表示改写后的查询词，多个子问题对应多个查询词，问题不需要转换时原样输出;
+    is_need_rewrite：boolean类型，当问题没有转换时输出false，当问题需要改写时输出true。
+
+    示例1：
+    用户提问：请问南京和北京的房价分别是多少
+    输出：{"origin_query":"请问南京和北京的房价分别是多少","rewriting_query":["南京的平均住宅价格","北京的平均住宅价格"],"is_need_rewrite":true}
+
+    示例2：
+    用户提问：北京常住人口有多少
+    输出：{"origin_query":"北京常住人口有多少","rewriting_query":["北京常住人口有多少"],"is_need_rewrite":false}
+
+    示例3：
+    用户提问：梅西在哪里踢球
+    输出：{"origin_query":"梅西在哪里踢球","rewriting_query":["梅西最近效力的俱乐部是哪个"],"is_need_rewrite":true}
+
+    请记住，您只能输出指定的json格式，您只需要改写提问，不要对提问生成答案。
+
 google_custom_search: 
   key: *
   cx: *

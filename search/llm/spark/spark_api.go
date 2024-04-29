@@ -79,7 +79,7 @@ func (model *SparkModel) GetChatRes(messages []llms.ChatMessage, msgListener cha
 		}
 
 		data := genParams1(conf.GlobalConfig.SparkLLM.Appid, sparkMsgs)
-		logger.Infof("send:%s", data)
+		logger.Debugf("send:%s", data)
 		conn.WriteJSON(data)
 
 	}()
@@ -111,7 +111,7 @@ func (model *SparkModel) GetChatRes(messages []llms.ChatMessage, msgListener cha
 		code := header["code"].(float64)
 		sid := data["sid"]
 		seq := choices["seq"]
-		fmt.Printf("sid:%v,seq:%v", sid, seq)
+		logger.Debugf("sid:%v,seq:%v", sid, seq)
 		if code != 0 {
 			return "", totalTokens
 		}
@@ -119,7 +119,7 @@ func (model *SparkModel) GetChatRes(messages []llms.ChatMessage, msgListener cha
 		//fmt.Println(status)
 		text := choices["text"].([]interface{})
 		content := text[0].(map[string]interface{})["content"].(string)
-		logger.Infof("status:%f,receive:%s", status, content)
+		logger.Debugf("status:%f,receive:%s", status, content)
 		//fmt.Print(content)
 		if status != 2 {
 			if msgListener != nil {
