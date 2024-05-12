@@ -5,12 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
+	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
+	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/llm"
+	"travel_ai_search/search/llm/dashscope"
 	"travel_ai_search/search/llm/spark"
 	"travel_ai_search/search/modelclient"
+	"travel_ai_search/search/qdrant"
+	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
+
+	"github.com/devinyf/dashscopego/qwen"
+	logger "github.com/sirupsen/logrus"
+	"github.com/tmc/langchaingo/llms"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -101,4 +111,92 @@ func (engine *MockSearchEngine) Search(ctx context.Context, config *conf.Config,
 		return make([]searchengineapi.SearchItem, 0), fmt.Errorf("read file err :%s", search_result_file)
 	}
 	return items, nil
+}
+
+func TestChatStream(t *testing.T) {
+	//todo:为测试创建Mock类
+	logger.SetLevel(logger.DebugLevel)
+	path := common.GetTestConfigPath()
+	t.Log("config path：", path)
+	config, err := conf.ParseConfig(path)
+	if err != nil {
+		t.Error("parse config err ", err.Error())
+		return
+	}
+	conf.GlobalConfig = config
+
+	tmpKVClient, err := kvclient.InitClient(config)
+	if err != nil {
+		t.Errorf("init kv client:%s err:%s", config.RedisAddr, err)
+		return
+	}
+
+	defer tmpKVClient.Close()
+
+	kvclient.InitDetailIdGen()
+
+	tmpVecClient, err := qdrant.InitVectorClient(config)
+	if err != nil {
+		t.Errorf("init vector client:%s err:%s", config.QdrantAddr, err)
+		return
+	}
+
+	defer tmpVecClient.Close()
+
+	tmpModelClient := modelclient.InitModelClient(config)
+	defer tmpModelClient.Close()
+
+	//llm.InitMemHistoryStoreInstance(5)
+	llm.InitKVHistoryStoreInstance(kvclient.GetInstance(), 10)
+	//用户历史清理
+	llm.GetHistoryStoreInstance().StarCleanTask()
+
+	tokens := int64(0)
+	answer := ""
+
+	var searchEngine searchengineapi.SearchEngine
+	var prompt llm.Prompt
+	var model llm.GenModel
+	var rewritingEngine rewrite.QueryRewritingEngine
+
+	//searchEngine = &searchengineapi.GoogleSearchEngine{}
+	searchEngine = &searchengineapi.OpenSerpSearchEngine{
+		Engines: conf.GlobalConfig.OpenSerpSearch.Engines,
+		BaseUrl: conf.GlobalConfig.OpenSerpSearch.Url,
+	}
+	prompt = &llm.ChatPrompt{
+		MaxLength:    1024,
+		PromptPrefix: conf.GlobalConfig.PromptTemplate.ChatPrompt,
+	}
+	model = &dashscope.DashScopeModel{
+		ModelName: qwen.QwenTurbo,
+		Room:      "chat",
+	}
+
+	rewritingEngine = &rewrite.LLMQueryRewritingEngine{
+		Model: &dashscope.DashScopeModel{
+			ModelName: qwen.QwenTurbo,
+			Room:      "chat",
+		},
+	}
+
+	engine := &ChatEngine{
+		SearchEngine:    searchEngine,
+		RewritingEnging: rewritingEngine,
+		Prompt:          prompt,
+		Model:           model,
+		Room:            "chat",
+	}
+	msgListener := make(chan string)
+	go func() {
+		for v := range msgListener {
+			t.Log("receive:", v)
+		}
+	}()
+	answer, tokens = engine.LLMChatStream("香港和纽约哪个房价高，请说明简短的理由", msgListener, make([]llms.ChatMessage, 0))
+
+	if tokens == 0 {
+		t.Error("answer:", answer, " tokens:", strconv.FormatInt(tokens, 10))
+	}
+	t.Log("answer:", answer)
 }

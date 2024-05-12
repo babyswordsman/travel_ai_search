@@ -3,6 +3,8 @@ package searchengineapi
 import (
 	"context"
 	"travel_ai_search/search/conf"
+
+	"github.com/tmc/langchaingo/schema"
 )
 
 type SearchItem struct {
@@ -15,4 +17,26 @@ type SearchItem struct {
 
 type SearchEngine interface {
 	Search(ctx context.Context, config *conf.Config, query string) ([]SearchItem, error)
+}
+
+func SnakeMerge(maxItems int, candidates ...[]schema.Document) []schema.Document {
+	mergedItems := make([]schema.Document, 0, maxItems)
+	maxLen := 0
+	for i := range candidates {
+		maxLen = max(maxLen, len(candidates[i]))
+	}
+	for ind := 0; ind < maxLen; ind++ {
+		for i := range candidates {
+			if ind < len(candidates[i]) {
+				mergedItems = append(mergedItems, candidates[i][ind])
+				if len(mergedItems) >= maxItems {
+					break
+				}
+			}
+		}
+		if len(mergedItems) >= maxItems {
+			break
+		}
+	}
+	return mergedItems
 }

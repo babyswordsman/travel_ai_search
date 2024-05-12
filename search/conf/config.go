@@ -85,8 +85,12 @@ type Config struct {
 var ErrHint = "这个问题，我不知道该怎么回答，我可能需要升级了..."
 var EmptyHint = "抱歉！我的知识还不够丰富，我正在努力学习..."
 var DETAIL_KEY_PREFIX string = "detail-"
+var DOC_KEY_PREFIX string = "doc-"
+var CHUNK_KEY_PREFIX string = "chunk-"
 var DETAIL_TITLE_FIELD string = "title"
 var DETAIL_CONTENT_FIELD string = "content"
+var DETAIL_CONTENT_CHUNK_FIELD = "chunkid"
+var DETAIL_CONTENT_DOC_FIELD = "docid"
 
 var GlobalConfig *Config
 

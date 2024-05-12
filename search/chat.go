@@ -6,20 +6,24 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/llm"
+	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
 
 	logger "github.com/sirupsen/logrus"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/schema"
 )
 
 type ChatEngine struct {
-	Room         string
-	SearchEngine searchengineapi.SearchEngine
-	Prompt       llm.Prompt
-	Model        llm.GenModel
+	Room            string
+	RewritingEnging rewrite.QueryRewritingEngine
+	SearchEngine    searchengineapi.SearchEngine
+	Prompt          llm.Prompt
+	Model           llm.GenModel
 }
 
 func (engine *ChatEngine) LLMChatPrompt(query string) (string, error) {
@@ -31,7 +35,7 @@ func (engine *ChatEngine) LLMChatPrompt(query string) (string, error) {
 	if len(candidates) == 0 {
 		return conf.EmptyHint, err
 	}
-	
+
 	docs, err := llm.PreRankDoc(query, candidates)
 	if err != nil {
 		return conf.ErrHint, fmt.Errorf(conf.ErrHint)
@@ -91,7 +95,7 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 
 	//systemMsg := llm.Message{Role: llm.ROLE_SYSTEM, Content: prompt}
 	//queryMsg := llm.Message{Role: llm.ROLE_USER, Content: query}
-	systemMsg := llms.SystemChatMessage{
+	/* systemMsg := llms.SystemChatMessage{
 		Content: prompt,
 	}
 	userMsg := llms.HumanChatMessage{
@@ -114,8 +118,8 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 			break
 		}
 	}
-	msgs = append(msgs, userMsg)
-
+	msgs = append(msgs, userMsg) */
+	msgs := llm.CombineLLMInputWithHistory(prompt, query, chatHistorys, 1024)
 	seqno := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	for _, msg := range msgs {
 		msgResp := llm.ChatStream{
@@ -164,15 +168,44 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 
 	logger.Infof("query:%s", query)
 
-	candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
-	if err != nil {
+	transformQueries, err := engine.RewritingEnging.Rewrite(query, chatHistorys)
+
+	if err != nil || len(transformQueries) == 0 {
+		logger.Errorf("rewrite query:%s", err.Error())
+		transformQueries = []string{query}
+	}
+
+	logger.Infof("query:%s,transformQueries:[%s]", query, strings.Join(transformQueries, ","))
+
+	if len(transformQueries) > 5 {
+		transformQueries = transformQueries[:5]
+		logger.Warnf("truncated  query:%s, transformQueries:[%s]", query, strings.Join(transformQueries, ","))
+	}
+	var prerankDocs []schema.Document
+	if len(transformQueries) > 1 {
+		multiDocs := engine.concurrentSearch(transformQueries)
+		if len(multiDocs) == 0 {
+			logger.Errorf("search query:[%s] result empty", strings.Join(transformQueries, ","))
+			return conf.ErrHint, 0
+		}
+		prerankDocs = searchengineapi.SnakeMerge(int(conf.GlobalConfig.MaxCandidates), multiDocs...)
+	} else {
+		candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, transformQueries[0])
+		if err != nil {
+			logger.Errorf("search query:%s err:%s", transformQueries[0], err.Error())
+			return conf.ErrHint, 0
+		}
+		prerankDocs, err = llm.PreRankDoc(transformQueries[0], candidates)
+		if err != nil {
+			logger.Errorf("prerank query:%s err:%s", query, err.Error())
+			return conf.ErrHint, 0
+		}
+	}
+	if len(prerankDocs) == 0 {
+		logger.Errorf("search query:[%s] result empty", query)
 		return conf.ErrHint, 0
 	}
-	docs, err := llm.PreRankDoc(query, candidates)
-	if err != nil {
-		return conf.ErrHint, 0
-	}
-	prompt, refDocuments, err := engine.Prompt.GenPrompt(docs)
+	prompt, refDocuments, err := engine.Prompt.GenPrompt(prerankDocs)
 	if err != nil {
 		return conf.ErrHint, 0
 	}
@@ -184,33 +217,65 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 	v, _ := json.Marshal(candidateResp)
 	msgListener <- string(v)
 
-	systemMsg := llms.SystemChatMessage{
-		Content: prompt,
-	}
-	userMsg := llms.HumanChatMessage{
-		Content: query,
-	}
-	entry := logger.WithField("query", userMsg).WithField("system", systemMsg)
+	msgs := llm.CombineLLMInputWithHistory(prompt, query, chatHistorys, 1024)
 
-	contentLength := 0
-	contentLength += len(systemMsg.GetContent())
-	contentLength += len(userMsg.GetContent())
+	answer, totalTokens = engine.Model.GetChatRes(msgs, msgListener)
+	logger.WithField("query", query).WithField("system", prompt).
+		WithField("totalTokens", totalTokens).WithField("answer", answer).
+		Debug("[chat]")
+	return
+}
 
-	msgs := make([]llms.ChatMessage, 0, len(chatHistorys)+2)
-	msgs = append(msgs, systemMsg)
-	//todo: 暂时只接受最长1024的长度，给prompt留了1024，后续再改成限制总长度
-	//需要留意聊天记录的顺序
-	remain := 1024 - len(userMsg.GetContent())
-	for i := len(chatHistorys) - 1; i >= 0; i-- {
-		remain = remain - len(chatHistorys[i].GetContent())
-		if remain > 0 {
-			msgs = append(msgs, chatHistorys[i])
-		} else {
-			break
+/*
+*
+并行查询多个query
+*/
+func (engine *ChatEngine) concurrentSearch(queries []string) [][]schema.Document {
+	wg := &sync.WaitGroup{}
+	wg.Add(len(queries))
+
+	resultChan := make(chan []schema.Document, len(queries))
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*60)
+	defer cancelFunc()
+
+	for _, q := range queries {
+		go func(ctx context.Context, query string, resultChan chan []schema.Document, wg *sync.WaitGroup) {
+			defer wg.Done()
+			candidates, err := engine.SearchEngine.Search(ctx, conf.GlobalConfig, query)
+			if err != nil {
+				logger.Errorf("search query:%s err:%s", query, err.Error())
+				resultChan <- make([]schema.Document, 0)
+			} else {
+				docs, err := llm.PreRankDoc(query, candidates)
+				if err != nil {
+					logger.Errorf("prerank query:%s err:%s", query, err.Error())
+				} else {
+					resultChan <- docs
+				}
+
+			}
+		}(ctx, q, resultChan, wg)
+	}
+
+	go func(resultChan chan []schema.Document, wg *sync.WaitGroup) {
+		wg.Wait()
+		close(resultChan)
+	}(resultChan, wg)
+
+	results := make([][]schema.Document, len(queries))
+	exit := false
+	for !exit {
+		select {
+		case items, closed := <-resultChan:
+			results = append(results, items)
+			if closed {
+				exit = true
+			}
+		case <-ctx.Done():
+			exit = true
+			logger.Errorf("timeout for search expected:%d,actual:%d,err:%s", len(queries), len(results), ctx.Err().Error())
 		}
 	}
-	msgs = append(msgs, userMsg)
-	answer, totalTokens = engine.Model.GetChatRes(msgs, msgListener)
-	entry.WithField("totalTokens", totalTokens).WithField("answer", answer).Info("[chat]")
-	return
+
+	return results
 }

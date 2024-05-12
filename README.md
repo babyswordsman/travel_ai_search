@@ -1,9 +1,10 @@
 # travel_ai_search
 ## 代办事项
-- [ ] 提取网页正文内容
+- [x] 提取网页正文内容
 - [ ] 登录
-- [ ] 多轮对话相关性提取
-- [ ] query 基于LLM转换用户的Query，判断是否需要进行外部检索
+- [ ] 历史对话的相关性内容提取,长问题的对话进行摘要
+- [x] query 改写
+- [ ] 判断是否需要进行外部检索
 - [ ] 思维链
 
 ```
@@ -62,4 +63,27 @@ apt-get update
 apt install libc6
 
 strings /lib/x86_b4-linux-gnu/libc.so.6 | grep GLIBC_
+```
+
+# tika-server
+文本提取使用了tika，启动tika见命令行
+https://github.com/apache/tika/tree/main/tika-server
+下载页面：
+https://tika.apache.org/download.html
+```
+$ java -jar tika-server/target/tika-server.jar --help
+   usage: tikaserver
+    -?,--help           this help message
+    -h,--host <arg>     host name (default = localhost)
+    -l,--log <arg>      request URI log level ('debug' or 'info')
+    -p,--port <arg>     listen port (default = 9998)
+    -s,--includeStack   whether or not to return a stack trace
+                        if there is an exception during 'parse'
+```
+
+# docconv
+https://github.com/sajari/docconv
+```
+#安装依赖
+apt-get install poppler-utils wv unrtf tidy
 ```

@@ -33,7 +33,12 @@ func TestQueryRewriting(t *testing.T) {
 		Room:      "chat",
 		ModelName: qwen.QwenTurbo,
 	}
-	results, err := RewriteQuery(model, "俄罗斯的首都是莫斯科，美国的首都是华盛顿，蒙古国的首都是哪里", make([]llms.ChatMessage, 0))
+
+	rewritingEngine := &LLMQueryRewritingEngine{
+		Model: model,
+	}
+
+	results, err := rewritingEngine.Rewrite("俄罗斯的首都是莫斯科，美国的首都是华盛顿，蒙古国的首都是哪里", make([]llms.ChatMessage, 0))
 
 	if err != nil {
 		t.Error("rewrite query err", err.Error())
@@ -43,7 +48,7 @@ func TestQueryRewriting(t *testing.T) {
 		t.Log("改写后的查询", ind, ":", v)
 	}
 
-	results, err = RewriteQuery(model, "纽约和香港哪个物价高", make([]llms.ChatMessage, 0))
+	results, err = rewritingEngine.Rewrite("纽约和香港哪个物价高", make([]llms.ChatMessage, 0))
 
 	if err != nil {
 		t.Error("rewrite query err", err.Error())

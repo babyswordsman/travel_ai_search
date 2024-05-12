@@ -92,6 +92,8 @@ func init_router(r *gin.Engine) {
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)
 		chat_route.GET("/", search.Index)
+		chat_route.GET("/rag/docs", search.UploadForm)
+		chat_route.POST("/rag/upload", search.Upload)
 	}
 }
 

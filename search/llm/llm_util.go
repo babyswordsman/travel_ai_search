@@ -58,3 +58,37 @@ type GenModel interface {
 	*/
 	GetChatRes(messages []llms.ChatMessage, msgListener chan string) (string, int64)
 }
+
+/*
+*
+
+maxContentLength:输入内容的最大长度，超过长度的历史会话会被截断
+*/
+func CombineLLMInputWithHistory(systemPrompt string, userInput string, chatHistorys []llms.ChatMessage, maxContentLength int) []llms.ChatMessage {
+	systemMsg := llms.SystemChatMessage{
+		Content: systemPrompt,
+	}
+	userMsg := llms.HumanChatMessage{
+		Content: userInput,
+	}
+
+	contentLength := 0
+	contentLength += len(systemMsg.GetContent())
+	contentLength += len(userMsg.GetContent())
+
+	msgs := make([]llms.ChatMessage, 0, len(chatHistorys)+2)
+	msgs = append(msgs, systemMsg)
+
+	//需要留意聊天记录的顺序
+	remain := maxContentLength - len(userMsg.GetContent())
+	for i := len(chatHistorys) - 1; i >= 0; i-- {
+		remain = remain - len(chatHistorys[i].GetContent())
+		if remain > 0 {
+			msgs = append(msgs, chatHistorys[i])
+		} else {
+			break
+		}
+	}
+	msgs = append(msgs, userMsg)
+	return msgs
+}

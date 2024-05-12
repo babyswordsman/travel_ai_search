@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"travel_ai_search/search/conf"
 )
 
 func ParseLoginCookie() {
@@ -73,4 +74,9 @@ func GetTestConfigPath() string {
 	}
 	path := fmt.Sprintf("%s/config/conf_local.yaml", wd)
 	return path
+}
+
+func GetUploadPath(config *conf.Config) string {
+	dir, _ := filepath.Split(config.CrawlerDataPath)
+	return dir
 }

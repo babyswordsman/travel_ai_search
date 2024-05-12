@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link href="/output.css" rel="stylesheet">
+    <title>Title</title>
+</head>
+<body>
+
+<h1>上传文件</h1>
+<form action="/rag/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" multiple/>
+    <input type="submit" value="提交"/>
+</form>
+
+<div>{{.user_name}}您好，当前支持的文件格式有txt/doc/docx/pdf/ppt/pptx</div>
+<h1>文件列表</h1>
+
+{{range $index,$value:=.fileNames}}
+<p>{{$index}}---{{$value}}</p>
+
+</body>
+</html>

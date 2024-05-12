@@ -11,34 +11,20 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
-func RewriteQuery(model llm.GenModel, query string, chatHistorys []llms.ChatMessage) ([]string, error) {
-	systemMsg := llms.SystemChatMessage{
-		Content: conf.GlobalConfig.PromptTemplate.QueryRewritingPrompt,
-	}
-	userMsg := llms.HumanChatMessage{
-		Content: query,
-	}
+type QueryRewritingEngine interface {
+	/**
+	根据原始问题，生成对应的改写问题，方便检索引擎搜索，当改写过程出错，返回原问题
+	*/
+	Rewrite(query string, chatHistorys []llms.ChatMessage) ([]string, error)
+}
 
-	contentLength := 0
-	contentLength += len(systemMsg.GetContent())
-	contentLength += len(userMsg.GetContent())
+type LLMQueryRewritingEngine struct {
+	Model llm.GenModel
+}
 
-	msgs := make([]llms.ChatMessage, 0, len(chatHistorys)+2)
-	msgs = append(msgs, systemMsg)
-	//todo: 暂时只接受最长1024的长度，给prompt留了1024，后续再改成限制总长度
-	//需要留意聊天记录的顺序
-	remain := 1024 - len(userMsg.GetContent())
-	for i := len(chatHistorys) - 1; i >= 0; i-- {
-		remain = remain - len(chatHistorys[i].GetContent())
-		if remain > 0 {
-			msgs = append(msgs, chatHistorys[i])
-		} else {
-			break
-		}
-	}
-	msgs = append(msgs, userMsg)
-
-	answer, tokens := model.GetChatRes(msgs, nil)
+func (engine *LLMQueryRewritingEngine) Rewrite(query string, chatHistorys []llms.ChatMessage) ([]string, error) {
+	msgs := llm.CombineLLMInputWithHistory(conf.GlobalConfig.PromptTemplate.QueryRewritingPrompt, query, chatHistorys, 1024)
+	answer, tokens := engine.Model.GetChatRes(msgs, nil)
 	if tokens == 0 {
 		logger.Errorf("query:%s, tokens:%d,rewriting:%s", query, tokens, answer)
 	} else {
@@ -62,9 +48,9 @@ func RewriteQuery(model llm.GenModel, query string, chatHistorys []llms.ChatMess
 	if ok {
 		rewritingQueries, ok := value.([]any)
 		if ok {
-			queries := make([]string,0)
-			for _,item := range rewritingQueries{
-				if q,ok:=item.(string);ok{
+			queries := make([]string, 0)
+			for _, item := range rewritingQueries {
+				if q, ok := item.(string); ok {
 					queries = append(queries, q)
 				}
 			}

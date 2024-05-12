@@ -2,18 +2,25 @@ package search
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/llm"
+	"travel_ai_search/search/llm/dashscope"
 	"travel_ai_search/search/llm/spark"
 	"travel_ai_search/search/manage"
+	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
 	"travel_ai_search/search/user"
 
+	"github.com/devinyf/dashscopego/qwen"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/gorilla/websocket"
@@ -84,6 +91,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 		var searchEngine searchengineapi.SearchEngine
 		var prompt llm.Prompt
 		var model llm.GenModel
+		var rewritingEngine rewrite.QueryRewritingEngine
 		switch room {
 		case "travel":
 			searchEngine = &searchengineapi.LocalSearchEngine{}
@@ -92,6 +100,12 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
 			}
 			model = &spark.SparkModel{Room: room}
+			rewritingEngine = &rewrite.LLMQueryRewritingEngine{
+				Model: &dashscope.DashScopeModel{
+					ModelName: qwen.QwenTurbo,
+					Room:      room,
+				},
+			}
 		case "chat":
 			fallthrough
 		default:
@@ -100,26 +114,38 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 				Engines: conf.GlobalConfig.OpenSerpSearch.Engines,
 				BaseUrl: conf.GlobalConfig.OpenSerpSearch.Url,
 			}
-			prompt = &llm.TravelPrompt{
+			prompt = &llm.ChatPrompt{
 				MaxLength:    1024,
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.ChatPrompt,
 			}
-			model = &spark.SparkModel{Room: room}
+			model = &dashscope.DashScopeModel{
+				ModelName: qwen.QwenTurbo,
+				Room:      room,
+			}
+
+			rewritingEngine = &rewrite.LLMQueryRewritingEngine{
+				Model: &dashscope.DashScopeModel{
+					ModelName: qwen.QwenTurbo,
+					Room:      room,
+				},
+			}
 		}
 
 		engine := &ChatEngine{
-			SearchEngine: searchEngine,
-			Prompt:       prompt,
-			Model:        model,
-			Room:         room,
+			SearchEngine:    searchEngine,
+			RewritingEnging: rewritingEngine,
+			Prompt:          prompt,
+			Model:           model,
+			Room:            room,
 		}
+
 		if conf.GlobalConfig.SparkLLM.IsMock {
 			answer, tokens = engine.LLMChatStreamMock(query, msgListener, llm.GetHistoryStoreInstance().LoadChatHistoryForLLM(userInfo.UserId, room))
 
 		} else {
 			answer, tokens = engine.LLMChatStream(query, msgListener, llm.GetHistoryStoreInstance().LoadChatHistoryForLLM(userInfo.UserId, room))
 		}
-		if answer != "" {
+		if tokens > 0 && answer != "" {
 			llm.GetHistoryStoreInstance().AddChatHistory(userInfo.UserId, room, query, answer)
 		}
 		contentResp := llm.ChatStream{
@@ -271,4 +297,135 @@ func Index(c *gin.Context) {
 		"cookie_key":   conf.GlobalConfig.CookieSession,
 		"cookie_value": cookie,
 	})
+}
+
+func UploadForm(ctx *gin.Context) {
+	curUser := user.GetCurUser(ctx)
+	//todo:跳转到登录页面
+	if curUser.UserId == user.EmpytUser.UserId {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"code":    http.StatusForbidden,
+			"message": "没有登录",
+		})
+		return
+	}
+	parentUpdloadDir := common.GetUploadPath(conf.GlobalConfig)
+	userUploadDir := filepath.Join(parentUpdloadDir, curUser.UserId)
+
+	dir, err := os.Open(userUploadDir)
+	if err != nil {
+		logger.Errorf("open %s err %s", userUploadDir, err.Error())
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	files, err := dir.Readdirnames(0)
+	if err != nil {
+		logger.Errorf("open %s err %s", userUploadDir, err.Error())
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.HTML(http.StatusOK, "upload.html", gin.H{
+		"user_name": curUser.UserName,
+		"fileNames": files,
+	})
+}
+
+func Upload(ctx *gin.Context) {
+	//todo:限制单用户大小
+	//todo:异步处理embedding
+
+	curUser := user.GetCurUser(ctx)
+	if curUser.UserId == user.EmpytUser.UserId {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"code":    http.StatusForbidden,
+			"message": "没有登录",
+		})
+		return
+	}
+	form, err := ctx.MultipartForm()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": "上传失败",
+		})
+		return
+	}
+
+	parentUpdloadDir := common.GetUploadPath(conf.GlobalConfig)
+	userUploadDir := filepath.Join(parentUpdloadDir, curUser.UserId)
+
+	fileInfo, err := os.Stat(userUploadDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(userUploadDir, 0644)
+			if err != nil {
+				if os.IsExist(err) {
+					err = nil
+				}
+			}
+
+		}
+	}
+	if !fileInfo.IsDir() {
+		err = errors.New("server err:upload path is not dir")
+	}
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": "上传失败:" + err.Error(),
+		})
+		return
+	}
+
+	files := form.File["file"]
+
+	for ind, file := range files {
+		fileName := file.Filename
+		ext := filepath.Ext(fileName)
+		fileName = fileName[:len(fileName)-len(ext)]
+		timestamp := time.Now().Format("2016_01_02_15_04_05")
+
+		fileName = fmt.Sprintf("%s_%s%s", fileName, timestamp, ext)
+
+		filePath := filepath.Join(userUploadDir, fileName)
+
+		err = ctx.SaveUploadedFile(file, filePath)
+		if err != nil {
+			logger.Errorf("save %s err:%s", filePath, err.Error())
+			break
+		}
+		logger.Infof("save [%d] file:%s", ind, filePath)
+		err = os.Chmod(filePath, 0644)
+		if err != nil {
+			logger.Errorf("chmod %s err:%s", filePath, err.Error())
+			break
+		}
+
+		err = manage.CreateDocIndex(filePath)
+		if err != nil {
+			logger.Errorf("create doc:%s index err:%s", filePath, err.Error())
+			break
+		}
+
+	}
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": "上传失败:" + err.Error(),
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "上传成功",
+	})
+
 }
