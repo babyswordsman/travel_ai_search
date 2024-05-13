@@ -151,7 +151,7 @@ func main() {
 	//启动对外服务接口
 	r := gin.Default()
 	//r.LoadHTMLGlob("resource/*.tmpl")
-	r.LoadHTMLFiles("resource/chat.tmpl", "resource/web/index.html")
+	r.LoadHTMLFiles("resource/chat.tmpl", "resource/web/index.html", "resource/web/upload.html")
 	r.StaticFile("/output.css", "./resource/web/output.css")
 	//r.StaticFile("/index.html", "./resource/web/index.html")
 	init_router(r)

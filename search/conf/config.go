@@ -91,6 +91,7 @@ var DETAIL_TITLE_FIELD string = "title"
 var DETAIL_CONTENT_FIELD string = "content"
 var DETAIL_CONTENT_CHUNK_FIELD = "chunkid"
 var DETAIL_CONTENT_DOC_FIELD = "docid"
+var UPLOAD_FILE_MODE os.FileMode = 0666
 
 var GlobalConfig *Config
 

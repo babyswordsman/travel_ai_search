@@ -3,21 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <link href="/output.css" rel="stylesheet">
-    <title>Title</title>
+    <title>个人文档库</title>
+    <script>  
+    window.addEventListener("load", function(evt) {
+        var but_upload = document.getElementById("upload");
+        but_upload.onclick=function(){
+
+            var fileObj = document.getElementById('file').files;	
+        
+            if(!fileObj || fileObj.length==0){
+                alert('请选择要上传的文件');
+                return;
+            }
+            var url = "/rag/upload";
+            var formData = new FormData();
+            
+            xhr = new XMLHttpRequest();
+            xhr.open("post",url,true);
+            //request.setRequestHeader("Content-Type","multipart/form-data");
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState === 4) {
+                    if(xhr.status === 200){
+                        alert(xhr.responseText);
+                        //todo:后台刷新
+                        document.location.reload();
+                    }else{
+                        alert("上传处理失败");
+                    }
+                    
+                }
+            };
+    
+            for (let i = 0; i < fileObj.length; i++) {
+                formData.append("file", fileObj[i])
+            }
+            xhr.send(formData); 
+
+        }
+    });
+    </script>
 </head>
-<body>
+<body class="bg-gray-50  ">
 
-<h1>上传文件</h1>
-<form action="/rag/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" multiple/>
-    <input type="submit" value="提交"/>
-</form>
-
-<div>{{.user_name}}您好，当前支持的文件格式有txt/doc/docx/pdf/ppt/pptx</div>
-<h1>文件列表</h1>
-
-{{range $index,$value:=.fileNames}}
-<p>{{$index}}---{{$value}}</p>
-
+    <div class="flex items-center justify-center bg-gray-50">
+        <div class="w-2/5 h-screen bg-gray-100 border-4 rounded overflow-auto">
+            <h1>上传文件</h1>
+            
+                <input class="p-2 m-4  border-2 rounded bg-gray-100 hover:bg-gray-300" type="file" id="file" multiple />
+                <br />
+                <button id="upload" class="p-2 m-4 text-xl border-2 rounded bg-red-100 hover:bg-red-300" >上传</button>
+            
+            <p class="text-left">
+            {{.user_name}}您好，当前支持的文件格式有txt/doc/docx/pdf/ppt/pptx
+            </p>
+        </div>
+        <div class="h-screen border-4 w-3/5 flex flex-col">
+            <h1  class="text-left p-2 m-4  text-xl">文件列表</h1>
+            <div id="file_list" class="text-left border-1 p-2 m-4 ">
+                <ul>
+                    {{range $index,$value:=.fileNames}}
+                    <li  class="m-4" >{{$index}}--{{$value}}</li>
+                    {{end}}
+                </ul>
+                
+            </div>
+        </div>
+    </div>
 </body>
 </html>

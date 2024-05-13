@@ -311,8 +311,20 @@ func UploadForm(ctx *gin.Context) {
 	}
 	parentUpdloadDir := common.GetUploadPath(conf.GlobalConfig)
 	userUploadDir := filepath.Join(parentUpdloadDir, curUser.UserId)
+	_, err := os.Stat(userUploadDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(userUploadDir, 0750)
+			if err != nil {
+				if os.IsExist(err) {
+					err = nil
+				}
+			}
 
+		}
+	}
 	dir, err := os.Open(userUploadDir)
+
 	if err != nil {
 		logger.Errorf("open %s err %s", userUploadDir, err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
@@ -321,6 +333,7 @@ func UploadForm(ctx *gin.Context) {
 		})
 		return
 	}
+	defer dir.Close()
 
 	files, err := dir.Readdirnames(0)
 	if err != nil {
@@ -341,6 +354,7 @@ func UploadForm(ctx *gin.Context) {
 func Upload(ctx *gin.Context) {
 	//todo:限制单用户大小
 	//todo:异步处理embedding
+	//todo:限制文件大小
 
 	curUser := user.GetCurUser(ctx)
 	if curUser.UserId == user.EmpytUser.UserId {
@@ -365,7 +379,7 @@ func Upload(ctx *gin.Context) {
 	fileInfo, err := os.Stat(userUploadDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(userUploadDir, 0644)
+			err = os.MkdirAll(userUploadDir, 0750)
 			if err != nil {
 				if os.IsExist(err) {
 					err = nil
@@ -391,7 +405,7 @@ func Upload(ctx *gin.Context) {
 		fileName := file.Filename
 		ext := filepath.Ext(fileName)
 		fileName = fileName[:len(fileName)-len(ext)]
-		timestamp := time.Now().Format("2016_01_02_15_04_05")
+		timestamp := time.Now().Format("2006_01_02_15_04_05")
 
 		fileName = fmt.Sprintf("%s_%s%s", fileName, timestamp, ext)
 
@@ -403,11 +417,11 @@ func Upload(ctx *gin.Context) {
 			break
 		}
 		logger.Infof("save [%d] file:%s", ind, filePath)
-		err = os.Chmod(filePath, 0644)
-		if err != nil {
-			logger.Errorf("chmod %s err:%s", filePath, err.Error())
-			break
-		}
+		// err = os.Chmod(filePath, conf.UPLOAD_FILE_MODE)
+		// if err != nil {
+		// 	logger.Errorf("chmod %s err:%s", filePath, err.Error())
+		// 	break
+		// }
 
 		err = manage.CreateDocIndex(filePath)
 		if err != nil {

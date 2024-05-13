@@ -84,6 +84,11 @@ $ java -jar tika-server/target/tika-server.jar --help
 # docconv
 https://github.com/sajari/docconv
 ```
-#安装依赖
+# 安装依赖
 apt-get install poppler-utils wv unrtf tidy
+```
+
+# 编译tailwindcss
+```
+npx tailwindcss -i ./web/a.css -o ./web/output.css --watch
 ```
