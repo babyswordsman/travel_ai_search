@@ -30,6 +30,7 @@ app = FastAPI()
 @app.post("/embedding/query",response_model=EmbedResponse) 
 async def embed_query(req:QueryRequest) -> Any:
     start_time = time.time()
+    print(len(req.queries),req.queries)
     res = embedding_server.embed_query(req.queries)
     resp = EmbedResponse(embs=res)
     print("embed_query exec times:",time.time()-start_time)
@@ -38,7 +39,8 @@ async def embed_query(req:QueryRequest) -> Any:
 @app.post("/embedding/passage",response_model=EmbedResponse) 
 async def embed_passage(req:PassageRequest) -> Any:
     start_time = time.time()
-    res = embedding_server.embed_query(req.passages)
+    print(len(req.passages),req.passages)
+    res = embedding_server.embed_passage(req.passages)
     resp = EmbedResponse(embs=res)
     print("embed_passage exec times:",time.time()-start_time)
     return resp

@@ -188,7 +188,7 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 			logger.Errorf("search query:[%s] result empty", strings.Join(transformQueries, ","))
 			return conf.ErrHint, 0
 		}
-		prerankDocs = searchengineapi.SnakeMerge(int(conf.GlobalConfig.MaxCandidates), multiDocs...)
+		prerankDocs = searchengineapi.SnakeMerge[schema.Document](int(conf.GlobalConfig.MaxCandidates), multiDocs...)
 	} else {
 		candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, transformQueries[0])
 		if err != nil {
@@ -204,6 +204,12 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 	if len(prerankDocs) == 0 {
 		logger.Errorf("search query:[%s] result empty", query)
 		return conf.ErrHint, 0
+	}
+	if logger.IsLevelEnabled(logger.DebugLevel) {
+		for i := range prerankDocs {
+			item := prerankDocs[i]
+			logger.Debugf("score:%f,%v", item.Score, item.Metadata)
+		}
 	}
 	prompt, refDocuments, err := engine.Prompt.GenPrompt(prerankDocs)
 	if err != nil {

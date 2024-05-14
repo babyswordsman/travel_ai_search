@@ -47,7 +47,7 @@ func extractFile(path string) (string, []schema.Document, error) {
 	return buf.String(), docs, nil
 }
 
-func deal_chunk(fileName string, docId string, seqno int, document *schema.Document) error {
+func deal_chunk(space string, fileName string, docId string, seqno int, document *schema.Document) error {
 	id, err := kvclient.FetchDetailNextId()
 	if err != nil {
 		return common.Errorf("fetch id", err)
@@ -58,6 +58,7 @@ func deal_chunk(fileName string, docId string, seqno int, document *schema.Docum
 		conf.DETAIL_CONTENT_FIELD:       document.PageContent,
 		conf.DETAIL_CONTENT_CHUNK_FIELD: strconv.FormatInt(int64(seqno), 10),
 		conf.DETAIL_CONTENT_DOC_FIELD:   docId,
+		"space":                         space,
 	}
 	values := make([]interface{}, 0)
 	for k, v := range tmp {
@@ -76,6 +77,7 @@ func deal_chunk(fileName string, docId string, seqno int, document *schema.Docum
 	row := qdrant.NewVectorRow(id, vector[0])
 	row.AppendString("id", key)
 	row.AppendString(conf.DETAIL_TITLE_FIELD, tmp[conf.DETAIL_TITLE_FIELD])
+	row.AppendString("space", space)
 
 	err = qdrant.GetInstance().AddVector(qdrant.DETAIL_COLLECTION, []*qdrant.VectorRow{row})
 	if err != nil {
@@ -84,7 +86,7 @@ func deal_chunk(fileName string, docId string, seqno int, document *schema.Docum
 	return nil
 }
 
-func deal_doc(fileName string, content string) (string, error) {
+func deal_doc(space string, fileName string, content string) (string, error) {
 	id, err := kvclient.FetchDetailNextId()
 	if err != nil {
 		return "", common.Errorf("fetch id", err)
@@ -93,6 +95,7 @@ func deal_doc(fileName string, content string) (string, error) {
 	tmp := map[string]string{
 		conf.DETAIL_TITLE_FIELD:   fileName,
 		conf.DETAIL_CONTENT_FIELD: content,
+		"space":                   space,
 	}
 	values := make([]interface{}, 0)
 	for k, v := range tmp {
@@ -110,7 +113,7 @@ func deal_doc(fileName string, content string) (string, error) {
 对文档进行分块保存，原始数据保存为：
 "doc-id":map[chunk_id]text
 */
-func CreateDocIndex(path string) error {
+func CreateDocIndex(path string, space string) error {
 	content, pages, err := extractFile(path)
 	if err != nil {
 		return common.Errorf(path, err)
@@ -120,13 +123,13 @@ func CreateDocIndex(path string) error {
 	if fileName == "" {
 		fileName = dir
 	}
-	docId, err := deal_doc(fileName, content)
+	docId, err := deal_doc(space, fileName, content)
 	if err != nil {
 		return common.Errorf(fileName, err)
 	}
 
 	for seqno := range pages {
-		err = deal_chunk(fileName, docId, seqno+1, &pages[seqno])
+		err = deal_chunk(space, fileName, docId, seqno+1, &pages[seqno])
 		if err != nil {
 			return common.Errorf(fmt.Sprintf("%s-%d", fileName, seqno), err)
 		}

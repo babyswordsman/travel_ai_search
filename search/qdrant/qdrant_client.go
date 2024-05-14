@@ -204,3 +204,43 @@ func (client *VectorClient) Search(collectionName string, vector []float32, topK
 	scoredPoints := response.GetResult()
 	return scoredPoints, nil
 }
+
+func (client *VectorClient) SearchWithSpace(collectionName string, space string, vector []float32, topK uint64,
+	fetchVector bool, fetchPlayload bool) ([]*pb.ScoredPoint, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	conds := make([]*pb.Condition, 0)
+	conds = append(conds, &pb.Condition{
+		ConditionOneOf: &pb.Condition_Field{
+			Field: &pb.FieldCondition{
+				Key: "space",
+				Match: &pb.Match{
+					MatchValue: &pb.Match_Keyword{
+						Keyword: space,
+					},
+				},
+			},
+		},
+	})
+	request := &pb.SearchPoints{
+		CollectionName: collectionName,
+		Limit:          topK,
+		Vector:         vector,
+		WithVectors: &pb.WithVectorsSelector{
+			SelectorOptions: &pb.WithVectorsSelector_Enable{Enable: fetchVector},
+		},
+		WithPayload: &pb.WithPayloadSelector{
+			SelectorOptions: &pb.WithPayloadSelector_Enable{Enable: fetchPlayload},
+		},
+		Filter: &pb.Filter{
+			Must: conds,
+		},
+	}
+	response, err := pb.NewPointsClient(client.conn).Search(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	scoredPoints := response.GetResult()
+	return scoredPoints, nil
+}

@@ -96,6 +96,9 @@ func (prompt *ChatPrompt) GenPrompt(candidates []schema.Document) (string, []sch
 func PreRankDoc(query string, candidates []searchengineapi.SearchItem) ([]schema.Document, error) {
 	//todo:加载网页，计算相似度可以并行
 	docs := make([]schema.Document, 0)
+
+	//存放有向量分的文档集合
+	rankDocs := make([]schema.Document, 0, len(candidates))
 	if len(candidates) > int(conf.GlobalConfig.MaxCandidates) {
 		candidates = candidates[:conf.GlobalConfig.MaxCandidates]
 	}
@@ -113,42 +116,51 @@ func PreRankDoc(query string, candidates []searchengineapi.SearchItem) ([]schema
 			}
 			docs = append(docs, tmps...)
 		} else {
-			docs = append(docs, schema.Document{
-				PageContent: item.Snippet,
-				Score:       item.Score,
-				Metadata:    map[string]any{"url": item.Link, "title": item.Title},
-			})
+
+			if item.Score > conf.GlobalConfig.PreRankingThreshold {
+				rankDocs = append(rankDocs, schema.Document{
+					PageContent: item.Snippet,
+					Score:       item.Score,
+					Metadata:    map[string]any{"url": item.Link, "title": item.Title},
+				})
+			}
 		}
 	}
-	passages := make([]string, 0, len(docs)+1)
-	for i := 0; i < len(docs); i++ {
-		passages = append(passages, docs[i].PageContent)
-	}
-	passageEmbeds, err := modelclient.GetInstance().PassageEmbedding(passages)
-	if err != nil {
-		return docs, common.Errorf("get passage embed err:%w", err)
-	}
-	queryEmbeds, err := modelclient.GetInstance().QueryEmbedding([]string{query})
+	if len(docs) > 0 {
 
-	if err != nil {
-		return docs, common.Errorf("get query embed err:%w", err)
-	}
-	if len(passageEmbeds) != len(docs) {
-		return docs, fmt.Errorf("len(passageEmbeds):%d != len(docs):%d ", len(passageEmbeds), len(docs))
-	}
-	for ind, v := range passageEmbeds {
-		score, err := common.CosineSimilarity(queryEmbeds[0], v)
+		passages := make([]string, 0, len(docs)+1)
+		for i := 0; i < len(docs); i++ {
+			if len(docs[i].PageContent) > 0 {
+				passages = append(passages, docs[i].PageContent)
+			} else {
+				logger.Errorf("page content %v is empty", docs[i].Metadata)
+			}
+		}
+		passageEmbeds, err := modelclient.GetInstance().PassageEmbedding(passages)
 		if err != nil {
-			logger.Error(err.Error())
-			continue
+			return docs, common.Errorf("get passage embed err:%w", err)
 		}
-		docs[ind].Score = score
-	}
+		queryEmbeds, err := modelclient.GetInstance().QueryEmbedding([]string{query})
 
-	rankDocs := make([]schema.Document, 0, len(docs))
-	for ind := range docs {
-		if docs[ind].Score > conf.GlobalConfig.PreRankingThreshold {
-			rankDocs = append(rankDocs, docs[ind])
+		if err != nil {
+			return docs, common.Errorf("get query embed err:%w", err)
+		}
+		if len(passageEmbeds) != len(docs) {
+			return docs, fmt.Errorf("len(passageEmbeds):%d != len(docs):%d ", len(passageEmbeds), len(docs))
+		}
+		for ind, v := range passageEmbeds {
+			score, err := common.CosineSimilarity(queryEmbeds[0], v)
+			if err != nil {
+				logger.Error(err.Error())
+				continue
+			}
+			docs[ind].Score = score
+		}
+
+		for ind := range docs {
+			if docs[ind].Score > conf.GlobalConfig.PreRankingThreshold {
+				rankDocs = append(rankDocs, docs[ind])
+			}
 		}
 	}
 

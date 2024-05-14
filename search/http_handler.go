@@ -94,7 +94,10 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 		var rewritingEngine rewrite.QueryRewritingEngine
 		switch room {
 		case "travel":
-			searchEngine = &searchengineapi.LocalSearchEngine{}
+			searchEngine = &searchengineapi.LocalSearchEngine{
+				MaxItems: int(conf.GlobalConfig.MaxCandidates),
+				Space:    curUser.UserId,
+			}
 			prompt = &llm.TravelPrompt{
 				MaxLength:    1024,
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
@@ -110,9 +113,16 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			fallthrough
 		default:
 			//searchEngine = &searchengineapi.GoogleSearchEngine{}
-			searchEngine = &searchengineapi.OpenSerpSearchEngine{
+			serpSearchEngine := &searchengineapi.OpenSerpSearchEngine{
 				Engines: conf.GlobalConfig.OpenSerpSearch.Engines,
 				BaseUrl: conf.GlobalConfig.OpenSerpSearch.Url,
+			}
+			localSearchEngine := &searchengineapi.LocalSearchEngine{
+				MaxItems: int(conf.GlobalConfig.MaxCandidates),
+				Space:    curUser.UserId,
+			}
+			searchEngine = &searchengineapi.HybridEngine{
+				SearchEngines: []searchengineapi.SearchEngine{localSearchEngine, serpSearchEngine},
 			}
 			prompt = &llm.ChatPrompt{
 				MaxLength:    1024,
@@ -423,7 +433,7 @@ func Upload(ctx *gin.Context) {
 		// 	break
 		// }
 
-		err = manage.CreateDocIndex(filePath)
+		err = manage.CreateDocIndex(filePath, curUser.UserId)
 		if err != nil {
 			logger.Errorf("create doc:%s index err:%s", filePath, err.Error())
 			break

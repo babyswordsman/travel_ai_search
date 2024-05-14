@@ -43,6 +43,14 @@ func InitModelClient(config *conf.Config) *ModelClient {
 }
 
 func (modelClient *ModelClient) QueryEmbedding(queries []string) ([][]float32, error) {
+	if len(queries) == 0 {
+		return nil, fmt.Errorf("query is empty")
+	}
+	for i := range queries {
+		if len(queries[i]) == 0 {
+			return nil, fmt.Errorf("query is empty")
+		}
+	}
 	body := map[string][]string{
 		"queries": queries,
 	}
@@ -72,6 +80,14 @@ func (modelClient *ModelClient) QueryEmbedding(queries []string) ([][]float32, e
 }
 
 func (modelClient *ModelClient) PassageEmbedding(passages []string) ([][]float32, error) {
+	if len(passages) == 0 {
+		return nil, fmt.Errorf("passages is empty")
+	}
+	for i := range passages {
+		if len(passages[i]) == 0 {
+			return nil, fmt.Errorf("passage is empty")
+		}
+	}
 	body := map[string][]string{
 		"passages": passages,
 	}

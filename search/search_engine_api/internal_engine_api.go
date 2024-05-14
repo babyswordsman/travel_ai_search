@@ -12,6 +12,8 @@ import (
 )
 
 type LocalSearchEngine struct {
+	MaxItems int
+	Space    string
 }
 
 func (engine *LocalSearchEngine) Search(ctx context.Context, config *conf.Config, query string) ([]SearchItem, error) {
@@ -24,8 +26,8 @@ func (engine *LocalSearchEngine) internalSearch(query string, threshold float32)
 		return nil, err
 	}
 
-	scores, err := qdrant.GetInstance().Search(qdrant.DETAIL_COLLECTION,
-		vectors[0], uint64(conf.GlobalConfig.MaxCandidates), false, true)
+	scores, err := qdrant.GetInstance().SearchWithSpace(qdrant.DETAIL_COLLECTION, engine.Space,
+		vectors[0], uint64(engine.MaxItems), false, true)
 	if err != nil {
 		logger.Errorf("{%s},search err:%s", query, err)
 		return nil, err

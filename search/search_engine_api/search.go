@@ -19,8 +19,8 @@ type SearchEngine interface {
 	Search(ctx context.Context, config *conf.Config, query string) ([]SearchItem, error)
 }
 
-func SnakeMerge(maxItems int, candidates ...[]schema.Document) []schema.Document {
-	mergedItems := make([]schema.Document, 0, maxItems)
+func SnakeMerge[T SearchItem | schema.Document](maxItems int, candidates ...[]T) []T {
+	mergedItems := make([]T, 0, maxItems)
 	maxLen := 0
 	for i := range candidates {
 		maxLen = max(maxLen, len(candidates[i]))
