@@ -20,7 +20,6 @@ import (
 	searchengineapi "travel_ai_search/search/search_engine_api"
 	"travel_ai_search/search/user"
 
-	"github.com/devinyf/dashscopego/qwen"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/gorilla/websocket"
@@ -102,8 +101,8 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			}
 			model = &spark.SparkModel{Room: room}
 			rewritingEngine = &rewrite.LLMQueryRewritingEngine{
-				Model: &dashscope.DashScopeModel{
-					ModelName: qwen.QwenTurbo,
+				Model: &dashscope.DashScopeOpenAIModel{
+					ModelName: conf.GlobalConfig.DashScopeLLM.Model,
 					Room:      room,
 				},
 			}
