@@ -151,7 +151,7 @@ func main() {
 	logger.WithFields(logger.Fields{"embedding": config.EmbeddingModelHost,
 		"reranker": config.RerankerModelHost}).Info("model client init")
 	//llm.InitMemHistoryStoreInstance(5)
-	llm.InitKVHistoryStoreInstance(kvclient.GetInstance(), 10)
+	llm.InitKVHistoryStoreInstance(kvclient.GetInstance(), 3)
 	//用户历史清理
 	llm.GetHistoryStoreInstance().StarCleanTask()
 
