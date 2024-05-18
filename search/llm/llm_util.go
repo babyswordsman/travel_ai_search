@@ -93,6 +93,12 @@ func CombineLLMInputWithHistory(systemPrompt string, userInput string, chatHisto
 		if chatHistorys[i].GetType() != llms.ChatMessageTypeAI && chatHistorys[i].GetType() != llms.ChatMessageTypeHuman {
 			continue
 		}
+		if count%2 == 0 && chatHistorys[i].GetType() != llms.ChatMessageTypeHuman {
+			continue
+		}
+		if count%2 == 1 && chatHistorys[i].GetType() != llms.ChatMessageTypeAI {
+			continue
+		}
 		remain = remain - len(chatHistorys[i].GetContent())
 		if remain > 0 {
 			msgs = append(msgs, chatHistorys[i])
