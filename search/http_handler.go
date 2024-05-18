@@ -101,7 +101,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 			}
 			model = &spark.SparkModel{Room: room}
 			rewritingEngine = &rewrite.LLMQueryRewritingEngine{
-				Model: &dashscope.DashScopeOpenAIModel{
+				Model: &dashscope.DashScopeModel{
 					ModelName: conf.GlobalConfig.DashScopeLLM.Model,
 					Room:      room,
 				},
@@ -125,13 +125,13 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 				MaxLength:    conf.LLM_PROMPT_TOKEN_LEN,
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.ChatPrompt,
 			}
-			model = &dashscope.DashScopeOpenAIModel{
+			model = &dashscope.DashScopeModel{
 				ModelName: conf.GlobalConfig.DashScopeLLM.Model,
 				Room:      room,
 			}
 
 			rewritingEngine = &rewrite.LLMQueryRewritingEngine{
-				Model: &dashscope.DashScopeOpenAIModel{
+				Model: &dashscope.DashScopeModel{
 					ModelName: conf.GlobalConfig.DashScopeLLM.Model,
 					Room:      room,
 				},

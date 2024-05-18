@@ -7,7 +7,6 @@ import (
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/llm/dashscope"
 
-	"github.com/devinyf/dashscopego/qwen"
 	logger "github.com/sirupsen/logrus"
 	"github.com/tmc/langchaingo/llms"
 )
