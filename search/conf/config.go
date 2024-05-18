@@ -76,6 +76,8 @@ type Config struct {
 
 	MaxCandidates int32 `yaml:"max_candidates"`
 
+	LogLevel string `yaml:"log_level"`
+
 	SparkLLM       SparkLLM       `yaml:"spark_llm"`
 	DashScopeLLM   DashScopeLLM   `yaml:"dash_scope_llm"`
 	PromptTemplate PromptTemplate `yaml:"prompt_template"`

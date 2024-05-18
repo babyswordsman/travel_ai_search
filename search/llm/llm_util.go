@@ -1,6 +1,8 @@
 package llm
 
 import (
+	"strings"
+
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -82,6 +84,12 @@ func CombineLLMInputWithHistory(systemPrompt string, userInput string, chatHisto
 	//需要留意聊天记录的顺序
 	remain := maxContentLength - len(userMsg.GetContent())
 	for i := len(chatHistorys) - 1; i >= 0; i-- {
+		if len(chatHistorys[i].GetContent()) == 0 || strings.TrimSpace(chatHistorys[i].GetContent()) == "" {
+			continue
+		}
+		if chatHistorys[i].GetType() != llms.ChatMessageTypeAI || chatHistorys[i].GetType() != llms.ChatMessageTypeHuman {
+			continue
+		}
 		remain = remain - len(chatHistorys[i].GetContent())
 		if remain > 0 {
 			msgs = append(msgs, chatHistorys[i])

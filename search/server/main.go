@@ -120,6 +120,13 @@ func main() {
 	}
 
 	conf.GlobalConfig = config
+	if config.LogLevel != "" {
+		lvl, err := logger.ParseLevel(config.LogLevel)
+		if err != nil {
+			logger.Error("parse log level err:", err.Error())
+		}
+		logger.SetLevel(lvl)
+	}
 	//初始化客户端
 	tmpKVClient, err := kvclient.InitClient(config)
 	if err != nil {
