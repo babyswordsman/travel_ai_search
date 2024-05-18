@@ -29,9 +29,9 @@ func TestQueryRewriting(t *testing.T) {
 	}
 	conf.GlobalConfig = config
 
-	model := &dashscope.DashScopeModel{
+	model := &dashscope.DashScopeOpenAIModel{
 		Room:      "chat",
-		ModelName: qwen.QwenTurbo,
+		ModelName: config.DashScopeLLM.Model,
 	}
 
 	rewritingEngine := &LLMQueryRewritingEngine{

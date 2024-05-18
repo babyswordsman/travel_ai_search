@@ -248,7 +248,7 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 	}
 	if len(prerankDocs) == 0 {
 		logger.Errorf("search query:[%s] result empty", query)
-		return conf.ErrHint, 0
+		//return conf.ErrHint, 0
 	}
 	if logger.IsLevelEnabled(logger.DebugLevel) {
 		for i := range prerankDocs {
