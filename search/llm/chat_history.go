@@ -179,24 +179,7 @@ func (store *KVChatHistoryStore) AddChatHistory(userId string, room string, quer
 	return err
 }
 func (store *KVChatHistoryStore) LoadChatHistoryForLLM(userId string, room string) []llms.ChatMessage {
-	key := GetKey(userId, room)
-	values, err := store.client.LRange(key, 0, store.maxSize-1)
-	msgs := make([]llms.ChatMessage, 0, len(values)*2+1)
-	if err != nil {
-		return msgs
-	}
-	for _, str := range values {
-		messages := make([]*Message, 0, 2)
-		err := json.Unmarshal([]byte(str), &messages)
-		if err != nil {
-			logger.Errorf("unmarshal %s err:%s", str, err)
-		}
-		for _, m := range messages {
-			msgs = append(msgs, m)
-		}
-
-	}
-	return msgs
+	return store.LoadChatHistoryForHuman(userId, room)
 }
 
 func (store *KVChatHistoryStore) LoadChatHistoryForHuman(userId string, room string) []llms.ChatMessage {
