@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/tmc/langchaingo/llms"
+	"github.com/vogo/logger"
 )
 
 var ROLE_SYSTEM = "system"
@@ -83,20 +84,24 @@ func CombineLLMInputWithHistory(systemPrompt string, userInput string, chatHisto
 
 	//需要留意聊天记录的顺序
 	remain := maxContentLength - len(userMsg.GetContent())
+	count := 0
 	for i := len(chatHistorys) - 1; i >= 0; i-- {
+		logger.Infof("type:%s,content:%s", chatHistorys[i].GetType(), chatHistorys[i].GetContent())
 		if len(chatHistorys[i].GetContent()) == 0 || strings.TrimSpace(chatHistorys[i].GetContent()) == "" {
 			continue
 		}
-		if chatHistorys[i].GetType() != llms.ChatMessageTypeAI || chatHistorys[i].GetType() != llms.ChatMessageTypeHuman {
+		if chatHistorys[i].GetType() != llms.ChatMessageTypeAI && chatHistorys[i].GetType() != llms.ChatMessageTypeHuman {
 			continue
 		}
 		remain = remain - len(chatHistorys[i].GetContent())
 		if remain > 0 {
 			msgs = append(msgs, chatHistorys[i])
+			count++
 		} else {
 			break
 		}
 	}
 	msgs = append(msgs, userMsg)
+	logger.Infof("add history num:%d", count)
 	return msgs
 }
