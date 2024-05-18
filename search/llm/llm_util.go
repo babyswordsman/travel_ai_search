@@ -3,8 +3,8 @@ package llm
 import (
 	"strings"
 
+	logger "github.com/sirupsen/logrus"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/vogo/logger"
 )
 
 var ROLE_SYSTEM = "system"
