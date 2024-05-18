@@ -73,17 +73,15 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 		defer func() {
 			if err := recover(); err != nil {
 				logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
-
-				contentResp := llm.ChatStream{
-					Type: llm.CHAT_TYPE_TOKENS,
-					Body: 0,
-					Room: room,
-				}
-				v, _ := json.Marshal(contentResp)
-				msgListener <- string(v)
-
+				// contentResp := llm.ChatStream{
+				// 	Type: llm.CHAT_TYPE_TOKENS,
+				// 	Body: 0,
+				// 	Room: room,
+				// }
+				// v, _ := json.Marshal(contentResp)
+				// msgListener <- string(v)
 			}
-			close(msgListener)
+
 		}()
 		tokens := int64(0)
 		answer := ""
@@ -219,6 +217,11 @@ func ChatStream(ctx *gin.Context) {
 	defer close(msgListener)
 
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
+			}
+		}()
 		for respMsg := range msgListener {
 			logger.Infof("send to browser:%s", respMsg)
 
