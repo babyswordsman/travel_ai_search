@@ -1,4 +1,5 @@
 #!/bin/bash
+# source /etc/profile.d/go.sh
 CURRENT_DIR=$(cd $(dirname $0);pwd)
 BASE_DIR=$(cd ..;pwd)
 echo $BASE_DIR

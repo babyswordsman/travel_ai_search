@@ -26,6 +26,8 @@ spark_llm:
 dash_scope_llm:
   key: sk-***
   host_url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+  openai_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen-turbo
 
 prompt_template:
   travel_prompt: |-

@@ -128,14 +128,14 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 				MaxLength:    conf.LLM_PROMPT_TOKEN_LEN,
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.ChatPrompt,
 			}
-			model = &dashscope.DashScopeModel{
-				ModelName: qwen.QwenTurbo,
+			model = &dashscope.DashScopeOpenAIModel{
+				ModelName: conf.GlobalConfig.DashScopeLLM.Model,
 				Room:      room,
 			}
 
 			rewritingEngine = &rewrite.LLMQueryRewritingEngine{
-				Model: &dashscope.DashScopeModel{
-					ModelName: qwen.QwenTurbo,
+				Model: &dashscope.DashScopeOpenAIModel{
+					ModelName: conf.GlobalConfig.DashScopeLLM.Model,
 					Room:      room,
 				},
 			}
@@ -380,7 +380,9 @@ func Upload(ctx *gin.Context) {
 		return
 	}
 	form, err := ctx.MultipartForm()
+
 	if err != nil {
+		logger.Errorf("ctx.MultipartForm err:%s", err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"code":    http.StatusInternalServerError,
 			"message": "上传失败:" + err.Error(),
@@ -407,6 +409,7 @@ func Upload(ctx *gin.Context) {
 		err = errors.New("server err:upload path is not dir")
 	}
 	if err != nil {
+		logger.Errorf("upload dir err:%s", err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"code":    http.StatusInternalServerError,
 			"message": "上传失败:" + err.Error(),
@@ -446,6 +449,7 @@ func Upload(ctx *gin.Context) {
 
 	}
 	if err != nil {
+		logger.Errorf("upload err:%s", err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"code":    http.StatusInternalServerError,
 			"message": "上传失败:" + err.Error(),

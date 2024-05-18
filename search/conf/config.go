@@ -24,6 +24,8 @@ type PromptTemplate struct {
 type DashScopeLLM struct {
 	Key     string `yaml:"key"`
 	HostUrl string `yaml:"host_url"`
+	OpenaiUrl string `yaml:"openai_url"`
+	Model string `yaml:"model"`
 }
 
 type GoogleCustomSearch struct {

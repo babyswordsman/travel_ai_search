@@ -20,6 +20,20 @@ pip3 install --upgrade-strategy eager install optimum[onnxruntime]==1.18.0
 Successfully installed coloredlogs-15.0.1 datasets-2.18.0 dill-0.3.8 evaluate-0.4.1 flatbuffers-24.3.25 fsspec-2024.2.0 humanfriendly-10.0 install-1.3.5 multiprocess-0.70.16 onnx-1.16.0 onnxruntime-1.16.3 optimum-1.18.0 pandas-2.0.3 protobuf-5.26.1 pyarrow-15.0.2 pyarrow-hotfix-0.6 python-dateutil-2.9.0.post0 pytz-2024.1 responses-0.18.0 sentencepiece-0.2.0 six-1.16.0 tzdata-2024.1 xxhash-3.4.1
 Successfully installed tokenizers-0.15.2 transformers-4.39.2
 
+# docconv
+https://github.com/sajari/docconv
+```
+# 安装依赖
+apt-get install poppler-utils wv unrtf tidy
+```
+
+# 编译tailwindcss
+```
+npx tailwindcss -i ./web/a.css -o ./web/output.css --watch
+```
+
+#embedding & reranker model
+
 BAAI模型下载网址：https://model.baai.ac.cn/models
  
 
@@ -81,14 +95,3 @@ $ java -jar tika-server/target/tika-server.jar --help
                         if there is an exception during 'parse'
 ```
 
-# docconv
-https://github.com/sajari/docconv
-```
-# 安装依赖
-apt-get install poppler-utils wv unrtf tidy
-```
-
-# 编译tailwindcss
-```
-npx tailwindcss -i ./web/a.css -o ./web/output.css --watch
-```
