@@ -85,7 +85,7 @@ func CombineLLMInputWithHistory(systemPrompt string, userInput string, chatHisto
 	//需要留意聊天记录的顺序
 	remain := maxContentLength - len(userMsg.GetContent())
 	count := 0
-	for i := len(chatHistorys) - 1; i >= 0; i-- {
+	for i := 0; i < len(chatHistorys); i++ {
 		logger.Infof("type:%s,content:%s", chatHistorys[i].GetType(), chatHistorys[i].GetContent())
 		if len(chatHistorys[i].GetContent()) == 0 || strings.TrimSpace(chatHistorys[i].GetContent()) == "" {
 			continue
