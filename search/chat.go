@@ -87,7 +87,7 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 	}
 	candidateResp := llm.ChatStream{
 		Type: llm.CHAT_TYPE_CANDIDATE,
-		Body: refDocuments,
+		Body: transferToFrontSearchItem(refDocuments),
 		Room: engine.Room,
 	}
 	v, _ := json.Marshal(candidateResp)
@@ -164,6 +164,36 @@ func (engine *ChatEngine) LLMChatStreamMock(query string, msgListener chan strin
 	return "sssss", 10
 }
 
+func transferToFrontSearchItem(docs []schema.Document) []searchengineapi.SearchItem {
+	if len(docs) == 0 {
+		return make([]searchengineapi.SearchItem, 0)
+	}
+	items := make([]searchengineapi.SearchItem, 0, len(docs))
+	for _, doc := range docs {
+		title := ""
+		link := ""
+		if titleTmp, ok := doc.Metadata["title"]; ok {
+			if title, ok = titleTmp.(string); !ok {
+				title = ""
+			}
+		}
+
+		if linkTmp, ok := doc.Metadata["url"]; ok {
+			if link, ok = linkTmp.(string); !ok {
+				link = ""
+			}
+		}
+
+		items = append(items, searchengineapi.SearchItem{
+			Title:   title,
+			Link:    link,
+			Score:   doc.Score,
+			Snippet: doc.PageContent,
+		})
+	}
+	return items
+}
+
 func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, chatHistorys []llms.ChatMessage) (answer string, totalTokens int64) {
 
 	logger.Infof("query:%s", query)
@@ -177,13 +207,28 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 
 	logger.Infof("query:%s,transformQueries:[%s]", query, strings.Join(transformQueries, ","))
 
-	if len(transformQueries) > 5 {
-		transformQueries = transformQueries[:5]
+	if len(transformQueries) > 2 {
+		transformQueries = transformQueries[:2]
 		logger.Warnf("truncated  query:%s, transformQueries:[%s]", query, strings.Join(transformQueries, ","))
 	}
 	var prerankDocs []schema.Document
 	if len(transformQueries) > 1 {
-		multiDocs := engine.concurrentSearch(transformQueries)
+		//multiDocs := engine.concurrentSearch(transformQueries)
+
+		multiDocs := make([][]schema.Document, 0)
+		for _, query := range transformQueries {
+			candidates, err := engine.SearchEngine.Search(context.Background(), conf.GlobalConfig, query)
+			if err != nil {
+				logger.Errorf("search query:%s err:%s", query, err.Error())
+				continue
+			}
+			docs, err := llm.PreRankDoc(query, candidates)
+			if err != nil {
+				logger.Errorf("prerank query:%s err:%s", query, err.Error())
+			} else {
+				multiDocs = append(multiDocs, docs)
+			}
+		}
 		if len(multiDocs) == 0 {
 			logger.Errorf("search query:[%s] result empty", strings.Join(transformQueries, ","))
 			return conf.ErrHint, 0
@@ -218,12 +263,12 @@ func (engine *ChatEngine) LLMChatStream(query string, msgListener chan string, c
 	candidateResp := llm.ChatStream{
 		Type: llm.CHAT_TYPE_CANDIDATE,
 		Room: engine.Room,
-		Body: refDocuments,
+		Body: transferToFrontSearchItem(refDocuments),
 	}
 	v, _ := json.Marshal(candidateResp)
 	msgListener <- string(v)
 
-	msgs := llm.CombineLLMInputWithHistory(prompt, query, chatHistorys, 1024)
+	msgs := llm.CombineLLMInputWithHistory(prompt, query, chatHistorys, conf.LLM_HISTORY_TOKEN_LEN)
 
 	answer, totalTokens = engine.Model.GetChatRes(msgs, msgListener)
 	logger.WithField("query", query).WithField("system", prompt).

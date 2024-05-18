@@ -99,7 +99,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 				Space:    curUser.UserId,
 			}
 			prompt = &llm.TravelPrompt{
-				MaxLength:    1024,
+				MaxLength:    conf.LLM_PROMPT_TOKEN_LEN,
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
 			}
 			model = &spark.SparkModel{Room: room}
@@ -125,7 +125,7 @@ func dealChatRequest(curUser user.User, msgData map[string]string, msgListener c
 				SearchEngines: []searchengineapi.SearchEngine{localSearchEngine, serpSearchEngine},
 			}
 			prompt = &llm.ChatPrompt{
-				MaxLength:    1024,
+				MaxLength:    conf.LLM_PROMPT_TOKEN_LEN,
 				PromptPrefix: conf.GlobalConfig.PromptTemplate.ChatPrompt,
 			}
 			model = &dashscope.DashScopeModel{
@@ -198,6 +198,11 @@ var chatUpgrader = websocket.Upgrader{
 }
 
 func ChatStream(ctx *gin.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
+		}
+	}()
 	w, r := ctx.Writer, ctx.Request
 
 	c, err := chatUpgrader.Upgrade(w, r, nil)
@@ -378,7 +383,7 @@ func Upload(ctx *gin.Context) {
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"code":    http.StatusInternalServerError,
-			"message": "上传失败",
+			"message": "上传失败:" + err.Error(),
 		})
 		return
 	}
