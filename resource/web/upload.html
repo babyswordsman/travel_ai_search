@@ -32,15 +32,14 @@
                         document.location.reload();
                     }
                     
-                }else{
-                    prompt("服务端处理中，请耐心等待，如果文件较大，可能需要几分钟");
                 }
             };
     
             for (let i = 0; i < fileObj.length; i++) {
                 formData.append("file", fileObj[i])
             }
-            xhr.send(formData); 
+            xhr.send(formData);
+            confirm("服务端处理中，请耐心等待，如果文件较大，可能需要几分钟"); 
 
         }
     });
