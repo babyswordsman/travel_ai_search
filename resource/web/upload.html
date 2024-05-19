@@ -8,7 +8,7 @@
     window.addEventListener("load", function(evt) {
         var but_upload = document.getElementById("upload");
         but_upload.onclick=function(){
-
+            
             var fileObj = document.getElementById('file').files;	
         
             if(!fileObj || fileObj.length==0){
@@ -17,7 +17,7 @@
             }
             var url = "/rag/upload";
             var formData = new FormData();
-            
+            but_upload.disabled = true;
             xhr = new XMLHttpRequest();
             xhr.open("post",url,true);
             //request.setRequestHeader("Content-Type","multipart/form-data");
@@ -29,8 +29,11 @@
                         document.location.reload();
                     }else{
                         alert("上传处理失败");
+                        document.location.reload();
                     }
                     
+                }else{
+                    prompt("服务端处理中，请耐心等待，如果文件较大，可能需要几分钟");
                 }
             };
     
