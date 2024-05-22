@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 	"travel_ai_search/search"
@@ -88,10 +89,10 @@ func init_router(r *gin.Engine) {
 	{
 
 		chat_route.POST("/chat_prompt", search.PrintChatPrompt)
-		chat_route.POST("/chat", search.Chat)
+		chat_route.GET("/chat", search.Index)
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)
-		chat_route.GET("/", search.Index)
+		chat_route.GET("/", search.Blog)
 		chat_route.GET("/rag/docs", search.UploadForm)
 		chat_route.POST("/rag/upload", search.Upload)
 	}
@@ -160,6 +161,7 @@ func main() {
 	//r.LoadHTMLGlob("resource/*.tmpl")
 	r.LoadHTMLFiles("resource/chat.tmpl", "resource/web/index.html", "resource/web/upload.html")
 	r.StaticFile("/output.css", "./resource/web/output.css")
+	r.StaticFS("/blog", http.Dir("blog"))
 	//r.StaticFile("/index.html", "./resource/web/index.html")
 	init_router(r)
 	logger.Info("start gin: ", config.ServerAddr)

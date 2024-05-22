@@ -316,6 +316,10 @@ func Index(c *gin.Context) {
 	})
 }
 
+func Blog(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/blog")
+}
+
 func UploadForm(ctx *gin.Context) {
 	curUser := user.GetCurUser(ctx)
 	//todo:跳转到登录页面
