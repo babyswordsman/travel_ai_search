@@ -1,4 +1,8 @@
 server_addr: 0.0.0.0:8081
+TlsServerAddr: 
+tls_server_addr: 
+tls_cert_path: 
+tls_cert_key_path: 
 chat_addr: 127.0.0.1:8081
 cookie_code_key: ***
 cookie_session: cookie_sess

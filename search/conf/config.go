@@ -22,10 +22,10 @@ type PromptTemplate struct {
 }
 
 type DashScopeLLM struct {
-	Key     string `yaml:"key"`
-	HostUrl string `yaml:"host_url"`
+	Key       string `yaml:"key"`
+	HostUrl   string `yaml:"host_url"`
 	OpenaiUrl string `yaml:"openai_url"`
-	Model string `yaml:"model"`
+	Model     string `yaml:"model"`
 }
 
 type GoogleCustomSearch struct {
@@ -45,8 +45,10 @@ type OpenSerpSearch struct {
 
 type Config struct {
 	//服务地址：0.0.0.0:8080
-	ServerAddr string `yaml:"server_addr"`
-
+	ServerAddr    string `yaml:"server_addr"`
+	TlsServerAddr string `yaml:"tls_server_addr"`
+	TlsCertPath   string `yaml:"tls_cert_path"`
+	TlsCertKeyPath   string `yaml:"tls_cert_key_path"`
 	//前端websocket地址
 	ChatAddr string `yaml:"chat_addr"`
 

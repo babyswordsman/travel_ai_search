@@ -165,5 +165,14 @@ func main() {
 	//r.StaticFile("/index.html", "./resource/web/index.html")
 	init_router(r)
 	logger.Info("start gin: ", config.ServerAddr)
-	r.Run(config.ServerAddr)
+	if len(config.TlsServerAddr) < 1 {
+		r.Run(config.ServerAddr)
+	} else {
+		e := r.RunTLS(config.TlsServerAddr, config.TlsCertPath, config.TlsCertKeyPath)
+		if e != nil {
+			logger.Info("start err:", e.Error())
+			fmt.Println("start err:", e.Error())
+		}
+	}
+
 }
