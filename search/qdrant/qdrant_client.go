@@ -17,6 +17,7 @@ type VectorClient struct {
 
 var vectorCli *VectorClient
 var DETAIL_COLLECTION string = "detail"
+var SKU_COLLECTION string = "sku"
 
 func GetInstance() *VectorClient {
 	return vectorCli
@@ -236,6 +237,33 @@ func (client *VectorClient) SearchWithSpace(collectionName string, space string,
 		Filter: &pb.Filter{
 			Must: conds,
 		},
+	}
+
+	response, err := pb.NewPointsClient(client.conn).Search(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	scoredPoints := response.GetResult()
+	return scoredPoints, nil
+}
+
+func (client *VectorClient) SearchWithFilter(collectionName string, vector []float32, filter *pb.Filter, topK uint64,
+	fetchVector bool, fetchPlayload bool) ([]*pb.ScoredPoint, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	request := &pb.SearchPoints{
+		CollectionName: collectionName,
+		Limit:          topK,
+		Vector:         vector,
+		WithVectors: &pb.WithVectorsSelector{
+			SelectorOptions: &pb.WithVectorsSelector_Enable{Enable: fetchVector},
+		},
+		WithPayload: &pb.WithPayloadSelector{
+			SelectorOptions: &pb.WithPayloadSelector_Enable{Enable: fetchPlayload},
+		},
+	}
+	if filter != nil {
+		request.Filter = filter
 	}
 	response, err := pb.NewPointsClient(client.conn).Search(ctx, request)
 	if err != nil {

@@ -32,3 +32,5 @@ qdrant_server/
 config/conf_local.yaml
 .vscode
 blog
+search/shopping/shopping_flow_test.go
+.DS_Store

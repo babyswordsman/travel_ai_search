@@ -8,11 +8,10 @@ import (
 	"os"
 	"time"
 	"travel_ai_search/search"
+	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/llm"
-	"travel_ai_search/search/modelclient"
-	"travel_ai_search/search/qdrant"
 	"travel_ai_search/search/user"
 
 	"github.com/gin-contrib/sessions"
@@ -129,28 +128,32 @@ func main() {
 		logger.SetLevel(lvl)
 	}
 	//初始化客户端
-	tmpKVClient, err := kvclient.InitClient(config)
-	if err != nil {
-		logger.Errorf("init kv client:%s err:%s", config.RedisAddr, err)
-	}
+	// tmpKVClient, err := kvclient.InitClient(config)
+	// if err != nil {
+	// 	logger.Errorf("init kv client:%s err:%s", config.RedisAddr, err)
+	// }
 
-	defer tmpKVClient.Close()
-	logger.WithField("redis", config.RedisAddr).Info("redis init")
+	// defer tmpKVClient.Close()
+	// logger.WithField("redis", config.RedisAddr).Info("redis init")
 
-	kvclient.InitDetailIdGen()
+	// //启动ID生成器
+	// kvclient.StartIdGen()
 
-	tmpVecClient, err := qdrant.InitVectorClient(config)
-	if err != nil {
-		logger.Errorf("init vector client:%s err:%s", config.QdrantAddr, err)
-	}
+	// tmpVecClient, err := qdrant.InitVectorClient(config)
+	// if err != nil {
+	// 	logger.Errorf("init vector client:%s err:%s", config.QdrantAddr, err)
+	// }
 
-	defer tmpVecClient.Close()
-	logger.WithField("qdrant", config.QdrantAddr).Info("qdrant init")
+	// defer tmpVecClient.Close()
+	// logger.WithField("qdrant", config.QdrantAddr).Info("qdrant init")
 
-	tmpModelClient := modelclient.InitModelClient(config)
-	defer tmpModelClient.Close()
-	logger.WithFields(logger.Fields{"embedding": config.EmbeddingModelHost,
-		"reranker": config.RerankerModelHost}).Info("model client init")
+	// tmpModelClient := modelclient.InitModelClient(config)
+	// defer tmpModelClient.Close()
+	// logger.WithFields(logger.Fields{"embedding": config.EmbeddingModelHost,
+	// 	"reranker": config.RerankerModelHost}).Info("model client init")
+
+	common.Start_client(config)
+	defer common.Stop_client()
 	//llm.InitMemHistoryStoreInstance(5)
 	llm.InitKVHistoryStoreInstance(kvclient.GetInstance(), 3)
 	//用户历史清理

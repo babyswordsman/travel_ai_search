@@ -16,6 +16,7 @@ import (
 	"travel_ai_search/search/llm/dashscope"
 	"travel_ai_search/search/llm/spark"
 	"travel_ai_search/search/manage"
+	"travel_ai_search/search/manage/shopping"
 	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
 	"travel_ai_search/search/user"
@@ -34,10 +35,11 @@ type ChatRequest struct {
 
 func InitData(c *gin.Context) {
 
-	num := manage.ParseData(conf.GlobalConfig, manage.CreateIndex)
-	c.JSON(http.StatusOK, gin.H{
-		"num": num,
-	})
+	// num := manage.ParseData(conf.GlobalConfig, manage.CreateIndex)
+	// c.JSON(http.StatusOK, gin.H{
+	// 	"num": num,
+	// })
+	shopping.LoadFile("./data/shopping_test_data.csv")
 }
 
 func PrintChatPrompt(c *gin.Context) {

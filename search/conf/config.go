@@ -45,10 +45,10 @@ type OpenSerpSearch struct {
 
 type Config struct {
 	//服务地址：0.0.0.0:8080
-	ServerAddr    string `yaml:"server_addr"`
-	TlsServerAddr string `yaml:"tls_server_addr"`
-	TlsCertPath   string `yaml:"tls_cert_path"`
-	TlsCertKeyPath   string `yaml:"tls_cert_key_path"`
+	ServerAddr     string `yaml:"server_addr"`
+	TlsServerAddr  string `yaml:"tls_server_addr"`
+	TlsCertPath    string `yaml:"tls_cert_path"`
+	TlsCertKeyPath string `yaml:"tls_cert_key_path"`
 	//前端websocket地址
 	ChatAddr string `yaml:"chat_addr"`
 
@@ -91,6 +91,7 @@ type Config struct {
 var ErrHint = "这个问题，我不知道该怎么回答，我可能需要升级了..."
 var EmptyHint = "抱歉！我的知识还不够丰富，我正在努力学习..."
 var DETAIL_KEY_PREFIX string = "detail-"
+var SKU_KEY_PREFIX string = "sku-"
 var DOC_KEY_PREFIX string = "doc-"
 var CHUNK_KEY_PREFIX string = "chunk-"
 var DETAIL_TITLE_FIELD string = "title"
@@ -100,6 +101,7 @@ var DETAIL_CONTENT_DOC_FIELD = "docid"
 var UPLOAD_FILE_MODE os.FileMode = 0666
 var LLM_HISTORY_TOKEN_LEN = 3096
 var LLM_PROMPT_TOKEN_LEN = 3096
+var EMB_VEC_SIZE = 768
 
 var GlobalConfig *Config
 

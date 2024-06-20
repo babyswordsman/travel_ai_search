@@ -1,5 +1,4 @@
 server_addr: 0.0.0.0:8081
-TlsServerAddr: 
 tls_server_addr: 
 tls_cert_path: 
 tls_cert_key_path: 
