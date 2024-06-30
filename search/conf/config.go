@@ -19,6 +19,9 @@ type PromptTemplate struct {
 	ChatPrompt           string `yaml:"chat_prompt"`
 	TravelPrompt         string `yaml:"travel_prompt"`
 	QueryRewritingPrompt string `yaml:"query_rewriting_prompt"`
+	QueryRoute           string `yaml:"query_route"`
+	AdditionalInfo       string `yaml:"additional_information"`
+	SearchCondition      string `yaml:"search_condition"`
 }
 
 type DashScopeLLM struct {
@@ -65,6 +68,8 @@ type Config struct {
 	RedisPassword string `yaml:"redis_password"`
 
 	QdrantAddr string `yaml:"qdrant_addr"`
+
+	QuickwitUrl string `yaml:"quickwit_url"`
 
 	//模型服务地址
 	EmbeddingModelHost   string `yaml:"embedding_model_host"`

@@ -133,7 +133,7 @@ func TestChatStream(t *testing.T) {
 
 	defer tmpKVClient.Close()
 
-	kvclient.InitDetailIdGen()
+	kvclient.StartIdGen()
 
 	tmpVecClient, err := qdrant.InitVectorClient(config)
 	if err != nil {

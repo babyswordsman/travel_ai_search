@@ -1,0 +1,73 @@
+version: 0.7 # File format version.
+
+index_id: "sku_a"
+
+doc_mapping:
+  mode: lenient
+  field_mappings:
+    - name: timestamp
+      description: "添加时间"
+      type: datetime
+      input_formats:
+        - unix_timestamp
+        - "%Y %m %d %H:%M:%S.%f"
+      output_format: unix_timestamp_millis
+      fast_precision: milliseconds
+      fast: true
+    - name: store_name
+      description: "店铺名称"
+      type: text
+      tokenizer: raw
+      
+    - name: product_main_pic
+      description: "商品主图"
+      type: text
+      tokenizer: raw
+      
+    - name: product_name
+      description: "商品名称"
+      type: text
+      tokenizer: chinese_compatible
+      record: position
+    - name: brand
+      description: "品牌名"
+      type: text
+      tokenizer: chinese_compatible
+      record: position
+    - name: first_level
+      description: "一级类目"
+      type: text
+      tokenizer: chinese_compatible
+      record: position
+    - name: second_level
+      description: "二级类目"
+      type: text
+      tokenizer: chinese_compatible
+      record: position
+    - name: third_level
+      description: "三级类目"
+      type: text
+      tokenizer: chinese_compatible
+      record: position
+    - name: product_price
+      description: "价格"
+      type: f64
+      output_format: number
+    - name: extended_props
+      description: "商品扩展属性"
+      type: json
+      tokenizer: chinese_compatible
+      record: position
+    - name: comment_summary
+      description: "商品评论信息"
+      type: json
+      tokenizer: chinese_compatible
+      record: position
+      
+  timestamp_field: timestamp
+  index_field_presence: true
+
+
+retention:
+  period: 90 years
+  schedule: daily

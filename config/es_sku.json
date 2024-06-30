@@ -1,0 +1,69 @@
+{
+  "settings": {
+  "analysis": {
+    "analyzer": {
+      "std_analyzer": { 
+        "type":      "standard",
+        "stopwords": "_english_"
+      }
+    }
+  }
+},
+  "mappings": {
+    "properties": {
+      "timestamp": {
+        "type":"date","format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
+      },
+      "store_name": {
+      //"comment":"店铺名称",
+        "type":"text",
+        "analyzer": "std_analyzer"
+      },
+      "product_main_pic": {
+        //"comment": "商品主图",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "product_name": {
+        //"comment": "商品名称",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "brand": {
+        //"comment": "品牌名",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "first_level": {
+        //"comment": "一级类目",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "second_level": {
+        //"comment": "二级类目",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "third_level": {
+        //"comment": "三级类目",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "product_price": {
+        //"comment": "价格",
+        "type": "double"
+        
+      },
+      "extended_props": {
+        //"comment": "商品扩展属性",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      },
+      "comment_summary": {
+        //"comment": "商品评论信息",
+        "type": "text",
+        "analyzer": "std_analyzer"
+      }
+    }
+  }
+}

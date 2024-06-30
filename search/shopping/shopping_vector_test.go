@@ -6,6 +6,7 @@ import (
 	"testing"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
+	initclients "travel_ai_search/search/init_clients"
 
 	logger "github.com/sirupsen/logrus"
 )
@@ -20,8 +21,8 @@ func TestVectorStore(t *testing.T) {
 		return
 	}
 	conf.GlobalConfig = config
-	common.Start_client(config)
-	defer common.Stop_client()
+	initclients.Start_client(config)
+	defer initclients.Stop_client()
 
 	store := NewVector()
 	docs, err := store.SimilaritySearch(context.Background(), "被子", 10)

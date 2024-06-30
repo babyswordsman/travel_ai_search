@@ -27,6 +27,10 @@ scrapy/
 data/
 pika_server
 qdrant_server
+quickwit
+es
+quickwit/
+es/
 pika_server/
 qdrant_server/
 config/conf_local.yaml

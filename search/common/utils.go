@@ -76,6 +76,29 @@ func GetTestConfigPath() string {
 	return path
 }
 
+func GetProjectPath() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = "/"
+	}
+	if strings.Contains(wd, "/travel_ai_search") {
+		dir := wd
+		file := ""
+		i := 20
+		for ; dir != "" && i >= 0; i-- {
+			for len(dir) > 0 && os.IsPathSeparator(dir[len(dir)-1]) {
+				dir = dir[:len(dir)-1]
+			}
+			dir, file = filepath.Split(dir)
+			if file == "travel_ai_search" {
+				wd = filepath.Join(dir, file)
+				break
+			}
+		}
+	}
+	return wd
+}
+
 func GetUploadPath(config *conf.Config) string {
 	dir, _ := filepath.Split(config.CrawlerDataPath)
 	return dir

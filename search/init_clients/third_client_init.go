@@ -1,10 +1,11 @@
-package common
+package initclients
 
 import (
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/qdrant"
+	"travel_ai_search/search/quickwit"
 
 	logger "github.com/sirupsen/logrus"
 )
@@ -30,10 +31,12 @@ func Start_client(config *conf.Config) {
 
 	modelclient.InitModelClient(config)
 
+	quickwit.InitQuickwitClient(config)
 }
 
 func Stop_client() {
 	kvclient.GetInstance().Close()
 	qdrant.GetInstance().Close()
 	modelclient.GetInstance().Close()
+	quickwit.GetInstance().Close()
 }

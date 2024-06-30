@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 	"travel_ai_search/search"
-	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
+	initclients "travel_ai_search/search/init_clients"
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/llm"
 	"travel_ai_search/search/user"
@@ -152,8 +152,8 @@ func main() {
 	// logger.WithFields(logger.Fields{"embedding": config.EmbeddingModelHost,
 	// 	"reranker": config.RerankerModelHost}).Info("model client init")
 
-	common.Start_client(config)
-	defer common.Stop_client()
+	initclients.Start_client(config)
+	defer initclients.Stop_client()
 	//llm.InitMemHistoryStoreInstance(5)
 	llm.InitKVHistoryStoreInstance(kvclient.GetInstance(), 3)
 	//用户历史清理
