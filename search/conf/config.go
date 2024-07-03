@@ -22,6 +22,7 @@ type PromptTemplate struct {
 	QueryRoute           string `yaml:"query_route"`
 	AdditionalInfo       string `yaml:"additional_information"`
 	SearchCondition      string `yaml:"search_condition"`
+	SkuRecommend         string `yaml:"sku_recommend"`
 }
 
 type DashScopeLLM struct {
@@ -70,6 +71,8 @@ type Config struct {
 	QdrantAddr string `yaml:"qdrant_addr"`
 
 	QuickwitUrl string `yaml:"quickwit_url"`
+
+	ESUrl []string `yaml:"es_url"`
 
 	//模型服务地址
 	EmbeddingModelHost   string `yaml:"embedding_model_host"`

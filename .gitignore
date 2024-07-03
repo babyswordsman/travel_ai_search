@@ -27,14 +27,12 @@ scrapy/
 data/
 pika_server
 qdrant_server
-quickwit
-es
-quickwit/
-es/
+
+quickwit_server
+es_server
 pika_server/
 qdrant_server/
 config/conf_local.yaml
 .vscode
 blog
-search/shopping/shopping_flow_test.go
 .DS_Store

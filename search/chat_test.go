@@ -200,3 +200,23 @@ func TestChatStream(t *testing.T) {
 	}
 	t.Log("answer:", answer)
 }
+
+func TestSwitchBreak(t *testing.T) {
+	c := 0
+	b := 0
+	a := 4
+f_:
+	for i := 0; i < 9; i++ {
+		switch a {
+		case 4:
+			c = 1
+			break f_
+		default:
+			c = -1
+
+		}
+		b = 1
+		break
+	}
+	t.Errorf("c=%d,b=%d", c, b)
+}

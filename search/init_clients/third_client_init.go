@@ -2,6 +2,7 @@ package initclients
 
 import (
 	"travel_ai_search/search/conf"
+	"travel_ai_search/search/es"
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/qdrant"
@@ -32,6 +33,11 @@ func Start_client(config *conf.Config) {
 	modelclient.InitModelClient(config)
 
 	quickwit.InitQuickwitClient(config)
+
+	_,err = es.InitESClient(config)
+	if err != nil {
+		logger.Errorf("init es client:%v err:%s", config.ESUrl, err)
+	}
 }
 
 func Stop_client() {

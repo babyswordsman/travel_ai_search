@@ -33,6 +33,7 @@ func TestParseData(t *testing.T) {
 
 func TestSkuParseData(t *testing.T) {
 	logger.SetLevel(logger.DebugLevel)
+	logger.SetReportCaller(true)
 	path := common.GetTestConfigPath()
 	t.Log("config path：", path)
 	config, err := conf.ParseConfig(path)
