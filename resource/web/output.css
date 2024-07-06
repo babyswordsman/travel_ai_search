@@ -601,8 +601,24 @@ video {
   height: 11rem;
 }
 
+.h-\[500px\] {
+  height: 500px;
+}
+
+.h-\[\] {
+  height: ;
+}
+
 .h-screen {
   height: 100vh;
+}
+
+.h-\[520px\] {
+  height: 520px;
+}
+
+.h-\[550px\] {
+  height: 550px;
 }
 
 .min-h-40 {

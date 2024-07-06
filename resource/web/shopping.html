@@ -71,6 +71,34 @@
             output.appendChild(d);
             output.scroll(0, output.scrollHeight);
         };
+
+        var printShopping = function(cur_room,details) {
+            if(details.length <=0){
+              return false;
+            }
+            var d = document.createElement("div");
+            d.className="flex flex-nowrap overflow-auto h-[550px]  mt-2";
+            for (let i = 0; i < details.length; ++i) {
+              var candidate = document.createElement("div");
+              candidate.className="w-96  h-[520px] min-w-96 min-h-40 border overflow-y-auto  m-2 border-gray-200 ";
+              var title = document.createElement("div");
+              title.className = "w-[370px] pl-2 font-bold text-xl text-left ";
+              
+              title.textContent=mysubstr(details[i].product_name,16);
+              
+              
+              
+              var cont = document.createElement("div");
+              cont.className="w-[370px]  text-left pl-2  h-[500px] ";
+              cont.innerHTML ="<img width=\"200px\" height=\"200px\" src=\""+details[i].product_main_pic+"\" /> <br />"+ "<span class='text-xl red bg-gray-300'>推荐理由</span>："+details[i].reason+"<br />"+"推荐分数："+details[i].score;
+              candidate.appendChild(title);
+              candidate.appendChild(cont);
+              d.appendChild(candidate);  
+            }
+            var output = document.getElementById(cur_room+"_output");
+            output.appendChild(d);
+            output.scroll(0, output.scrollHeight);
+        };
     
         document.getElementById("clean").onclick = function(evt) {
             var output = document.getElementById(chatroom+"_output");
@@ -114,6 +142,8 @@
                 var msg = JSON.parse(evt.data)
                 if(msg.type=="candidate"){
                     printCandidate(msg.room,msg.body);
+                }else if (msg.type == "shop"){
+                  printShopping(msg.room,msg.body);
                 }else if(msg.type=="msg"){
                     var msg_div = document.getElementById("msg_"+msg.seqno);
                     if(msg_div == null){

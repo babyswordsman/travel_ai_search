@@ -91,13 +91,17 @@ func (engine *ShoppingEngine) saveChatHistory(curUser user.User, room, query, re
 	llmutil.GetHistoryStoreInstance().AddChatHistory(curUser.UserId, room, query, response)
 }
 
-func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (string, error) {
+// return:
+// type  shop or msg
+// body  product infor or text msg
+// error
+func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (string, any, error) {
 	ctx := context.Background()
 	llm, err := NewDashScopeModel()
 	logEntry := logger.WithField("uid", curUser.UserId)
 	if err != nil {
 		logEntry.Errorf("create llm client err:%s", err.Error())
-		return "", err
+		return llmutil.CHAT_TYPE_MSG, "", err
 	}
 
 	defaultQAPromptTemplate := prompts.NewPromptTemplate(
@@ -118,25 +122,25 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 	intentMap, err := engine.doLLM(logEntry, llmChain, inputs, ctx)
 
 	if err != nil {
-		return "", common.Errorf("request intent err", err)
+		return llmutil.CHAT_TYPE_MSG, "", common.Errorf("request intent err", err)
 	}
 
 	shoppingIntent := engine.parseIntent(intentMap)
 	if !shoppingIntent.IsShopping {
-		return UNMATCH_SHOPPING_HIT, nil
+		return llmutil.CHAT_TYPE_MSG, UNMATCH_SHOPPING_HIT, nil
 	}
 
 	resp, err := engine.search(&shoppingIntent)
 	if err != nil {
 		logEntry.Error("search for shopping intent error:", err.Error())
 		//TODO: 出默认列表
-		return "", nil
+		return llmutil.CHAT_TYPE_MSG, "", nil
 	}
 
 	if len(resp.Hits) == 0 {
 		logEntry.Error("search for shopping intent hits empty")
 		//TODO:不返空，给几个其他的推荐
-		return EMPTY_SHOPPING_HIT, nil
+		return llmutil.CHAT_TYPE_MSG, EMPTY_SHOPPING_HIT, nil
 	}
 
 	//TODO:需要做相似性截断
@@ -157,10 +161,10 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 
 			if err != nil {
 				logEntry.Error("gen advice error:", err.Error())
-				return "", err
+				return llmutil.CHAT_TYPE_MSG, "", err
 			}
 			engine.saveChatHistory(curUser, room, query, advice)
-			return advice, nil
+			return llmutil.CHAT_TYPE_MSG, advice, nil
 		} else {
 			logEntry.Infof("hit sku less than %d", hitThreshold)
 		}
@@ -174,7 +178,7 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 	}
 	str, err := engine.recommend(independentQuery, curUser, resp.Hits)
 
-	return str, err
+	return llmutil.CHAT_TYPE_SHOPPING, str, err
 
 }
 
@@ -353,7 +357,7 @@ func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, r
 
 }
 
-func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User, relDocs []*detail.SkuDocumentResp) (string, error) {
+func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User, relDocs []*detail.SkuDocumentResp) ([]*detail.RecommendSkuResponse, error) {
 	//追问用户提供一些商品属性相关的喜好,使用查到的商品的属性名做为模板
 	logEntry := logger.WithField("uid", curUser.UserId)
 	idMap := make(map[string]*detail.SkuDocumentResp)
@@ -373,7 +377,7 @@ func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User,
 	llm, err := NewDashScopeModel()
 	if err != nil {
 		logEntry.Error("new llm err:", err.Error())
-		return "", nil
+		return nil, err
 	}
 	defaultQAPromptTemplate := prompts.NewPromptTemplate(
 		conf.GlobalConfig.PromptTemplate.SkuRecommend,
@@ -394,7 +398,7 @@ func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User,
 
 	if err != nil {
 		logEntry.Error("request llm err:", err.Error())
-		return "", nil
+		return nil, err
 	}
 	recommendSkuList := make([]detail.RecommendSku, 0, len(skuScoreMap))
 	for _, skuMap := range skuScoreMap {
@@ -450,8 +454,21 @@ func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User,
 		return recommendSkuList[i].Score > recommendSkuList[j].Score
 	})
 
-	buf, err := json.Marshal(recommendSkuList)
-	return string(buf), err
+	resultList := make([]*detail.RecommendSkuResponse, 0)
+	for _, sku := range recommendSkuList {
+		var resp detail.RecommendSkuResponse
+		resp.ProductId = sku.Id
+		resp.Score = sku.Score
+		resp.Reason = sku.Reason
+		resp.ProductName = idMap[sku.Id].ProductName
+		resp.ProductMainPic = idMap[sku.Id].ProductMainPic
+		resp.ProductPrice = idMap[sku.Id].ProductPrice
+
+		resultList = append(resultList, &resp)
+	}
+
+	//buf, err := json.Marshal(resultList)
+	return resultList, err
 }
 
 // 9解析购物意图
@@ -601,7 +618,7 @@ func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse
 		return nil, fmt.Errorf("search with intent,query is empty")
 	}
 	query := map[string]any{
-		"size": 10,
+		"size": 3,
 		"query": map[string]any{
 			"bool": map[string]any{
 				"should": matchs,

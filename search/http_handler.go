@@ -82,16 +82,17 @@ func dealShoppingRequest(curUser user.User, msgData map[string]string, msgListen
 			logger.Debugf("[%s] query:%s", curUser.UserId, query)
 		}
 		engine := shopping.ShoppingEngine{}
-		answer, err := engine.Flow(curUser, room, query)
+		msgType, answer, err := engine.Flow(curUser, room, query)
 		if err != nil {
 			logger.Errorf("[%s] query:%s err:%s", curUser.UserId, query, err.Error())
 			answer = "我好像碰到点问题，再试试问我吧"
+			msgType = llm.CHAT_TYPE_MSG
 		}
 		if logger.IsLevelEnabled(logger.DebugLevel) {
 			logger.Debugf("[%s] answer:%s", curUser.UserId, answer)
 		}
 		msgResp := llm.ChatStream{
-			Type:     llm.CHAT_TYPE_MSG,
+			Type:     msgType,
 			Body:     answer,
 			Room:     room,
 			ChatType: string(llms.ChatMessageTypeAI),
@@ -101,7 +102,7 @@ func dealShoppingRequest(curUser user.User, msgData map[string]string, msgListen
 		v, _ := json.Marshal(msgResp)
 		msgListener <- string(v)
 		//todo:临时
-		tokens = int64(len(answer))
+		tokens = int64(len(v))
 
 		contentResp := llm.ChatStream{
 			ChatType: string(llms.ChatMessageTypeAI),

@@ -32,7 +32,7 @@ func TestShoppingFlow(t *testing.T) {
 	defer initclients.Stop_client()
 	llm.InitMemHistoryStoreInstance(5)
 	engine := ShoppingEngine{}
-	res, err := engine.Flow(getTestUser(), SHOPPING_ROOM, "推荐夏天的床单,100字以内")
+	_, res, err := engine.Flow(getTestUser(), SHOPPING_ROOM, "推荐夏天的床单,100字以内")
 	if err != nil {
 		t.Error("flow err :", err.Error())
 	} else {
@@ -167,7 +167,7 @@ func TestShoppingFlowWithAdvice(t *testing.T) {
 	resp := "您好，为了更好地帮您挑选拍照功能出色的手机，我想了解一下您的具体需求。您更偏爱哪个屏幕分辨率？后摄主像素一般需要达到多少？还有，对CPU性能有什么特殊要求吗？另外，机身颜色和设计风格也是考虑因素之一吧？请告诉我这些详细信息，谢谢！"
 	engine.saveChatHistory(getTestUser(), SHOPPING_ROOM, query, resp)
 
-	res, err := engine.Flow(getTestUser(), SHOPPING_ROOM, "存储大一点，像素高的")
+	_, res, err := engine.Flow(getTestUser(), SHOPPING_ROOM, "存储大一点，像素高的")
 	if err != nil {
 		t.Error("flow err :", err.Error())
 	} else {

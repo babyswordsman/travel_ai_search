@@ -20,6 +20,13 @@ type RecommendSku struct {
 	Reason string
 }
 
+type RecommendSkuResponse struct {
+	ProductId string  `json:"item_id"`
+	Score     float64 `json:"score"`
+	Reason    string  `json:"reason"`
+	SkuDocument
+}
+
 type SkuDocument struct {
 	Id             string  `json:"-"`
 	Timestamp      int64   `json:"timestamp"`
