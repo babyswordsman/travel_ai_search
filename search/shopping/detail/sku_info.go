@@ -36,6 +36,10 @@ type SkuDocument struct {
 	ExtendedProps  string `json:"extended_props"`
 	CommentSummary string `json:"comment_summary"`
 }
+type SkuDocumentResp struct {
+	SkuDocument
+	Score float64
+}
 
 func CrawleJsonToSku(content string) (*SkuDocument, error) {
 	skuMap := make(map[string]any)
@@ -145,8 +149,8 @@ func CrawleTransferSku(skuMap map[string]any) *SkuDocument {
 	return &skuDoc
 }
 
-func EsTransferSku(skuMap map[string]any) *SkuDocument {
-	var skuDoc SkuDocument
+func EsTransferSku(skuMap map[string]any) *SkuDocumentResp {
+	var skuDoc SkuDocumentResp
 	skuDoc.Timestamp = time.Now().UnixMilli()
 	storeName, ok := skuMap["store_name"]
 	if ok {

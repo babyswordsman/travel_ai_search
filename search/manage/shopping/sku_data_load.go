@@ -40,7 +40,7 @@ func ParseSkuData(path string) int32 {
 		}
 
 		skuDoc := detail.CrawleTransferSku(skuMap)
-
+		//skuDoc.Id = fmt.Sprintf("sku-%d-%d", time.Now().UnixMilli(), parseNum)
 		buf, err := json.Marshal(skuDoc)
 
 		if err != nil {
@@ -51,7 +51,7 @@ func ParseSkuData(path string) int32 {
 			logger.Debugln(string(buf))
 		}
 
-		i, err := es.GetInstance().AddDocument("sku", fmt.Sprintf("sku-%d-%d", time.Now().UnixMilli(), parseNum), string(buf))
+		i, err := es.GetInstance().AddDocument("sku", fmt.Sprintf("id-%d-%d", time.Now().UnixMilli(), parseNum), string(buf))
 		if err != nil {
 			logger.Errorln("add document err", err)
 			continue

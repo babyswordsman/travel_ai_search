@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/es"
 	llmutil "travel_ai_search/search/llm"
@@ -117,7 +118,7 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 	intentMap, err := engine.doLLM(logEntry, llmChain, inputs, ctx)
 
 	if err != nil {
-		return "", err
+		return "", common.Errorf("request intent err", err)
 	}
 
 	shoppingIntent := engine.parseIntent(intentMap)
@@ -246,19 +247,19 @@ func (engine *ShoppingEngine) doLLMRespStr(logEntry *logger.Entry, llmChain *cha
 	list_start := strings.Index(content, "[")
 	list_end := strings.LastIndex(content, "]")
 
-	if list_start < start {
+	if list_start >= 0 && list_start < start {
 		start = list_start
 		end = list_end
 	}
 
 	if start == -1 || end == -1 {
-		return "", errors.New("invalid json:" + content)
+		return "", common.Errorf(fmt.Sprintf("parse json:%d,%d", start, end), errors.New("invalid json:"+content))
 	}
 	jsonContent := content[start : end+1]
 	return jsonContent, nil
 }
 
-func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, relDocs []*detail.SkuDocument) (string, error) {
+func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, relDocs []*detail.SkuDocumentResp) (string, error) {
 	//追问用户提供一些商品属性相关的喜好,使用查到的商品的属性名做为模板
 	logEntry := logger.WithField("uid", curUser.UserId)
 
@@ -352,10 +353,10 @@ func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, r
 
 }
 
-func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User, relDocs []*detail.SkuDocument) (string, error) {
+func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User, relDocs []*detail.SkuDocumentResp) (string, error) {
 	//追问用户提供一些商品属性相关的喜好,使用查到的商品的属性名做为模板
 	logEntry := logger.WithField("uid", curUser.UserId)
-	idMap := make(map[string]*detail.SkuDocument)
+	idMap := make(map[string]*detail.SkuDocumentResp)
 	var skuBuf strings.Builder
 	for i, doc := range relDocs {
 		skuBuf.WriteString("SKU主键:")
@@ -562,15 +563,15 @@ func (engine *ShoppingEngine) parseIntent(intentMap map[string]any) ShoppingInte
 }
 
 type SkuSearchResponse struct {
-	NumHits int                   `json:"num_hits"`
-	Hits    []*detail.SkuDocument `json:"hits"`
+	NumHits int                       `json:"num_hits"`
+	Hits    []*detail.SkuDocumentResp `json:"hits"`
 }
 
 func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse, error) {
 	matchs := make([]map[string]any, 0)
 	if len(intent.ProductName) > 0 {
 		matchs = append(matchs, map[string]any{"match": map[string]any{
-			"product_name": intent.ProductName,
+			"product_name": map[string]any{"query": intent.ProductName, "boost": 10},
 		}})
 	}
 	if len(intent.Category) > 0 {
@@ -616,14 +617,21 @@ func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse
 	took := int(r["took"].(float64))
 	logger.Info("hits:", hits, ",took:", took)
 	// Print the ID and document source for each hit.
-	docs := make([]*detail.SkuDocument, 0)
+	docs := make([]*detail.SkuDocumentResp, 0)
 	for _, hit := range r["hits"].(map[string]interface{})["hits"].([]interface{}) {
+		if logger.IsLevelEnabled(logger.DebugLevel) {
+			for k, v := range hit.(map[string]interface{}) {
+				logger.Debugf("k:%s,v:%v", k, v)
+			}
+		}
+
 		id := hit.(map[string]interface{})["_id"]
 		source := hit.(map[string]interface{})["_source"]
-
+		score := hit.(map[string]interface{})["_score"]
 		skuDoc := detail.EsTransferSku(source.(map[string]interface{}))
 
 		skuDoc.Id = id.(string)
+		skuDoc.Score = score.(float64)
 		docs = append(docs, skuDoc)
 	}
 	resp := &SkuSearchResponse{

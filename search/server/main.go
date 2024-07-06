@@ -89,6 +89,7 @@ func init_router(r *gin.Engine) {
 
 		chat_route.POST("/chat_prompt", search.PrintChatPrompt)
 		chat_route.GET("/chat", search.Index)
+		chat_route.GET("/shopping", search.Shop)
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)
 		chat_route.GET("/", search.Blog)
@@ -162,7 +163,7 @@ func main() {
 	//启动对外服务接口
 	r := gin.Default()
 	//r.LoadHTMLGlob("resource/*.tmpl")
-	r.LoadHTMLFiles("resource/chat.tmpl", "resource/web/index.html", "resource/web/upload.html")
+	r.LoadHTMLFiles("resource/chat.tmpl", "resource/web/index.html", "resource/web/upload.html", "resource/web/shopping.html")
 	r.StaticFile("/output.css", "./resource/web/output.css")
 	r.StaticFS("/blog", http.Dir("blog"))
 	//r.StaticFile("/index.html", "./resource/web/index.html")

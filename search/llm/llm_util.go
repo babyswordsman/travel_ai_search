@@ -41,14 +41,15 @@ func (msg *Message) GetTimestamp() int64 {
 	return msg.Timestamp
 }
 
-var CHAT_TYPE_CANDIDATE = "candidate"
-var CHAT_TYPE_TOKENS = "tokens"
-var CHAT_TYPE_MSG = "msg"
+// 前端websocket解析时依赖这个类型
+var CHAT_TYPE_CANDIDATE = "candidate" //参考的文档、商品、网页等
+var CHAT_TYPE_TOKENS = "tokens"       //本次交互的tokens数
+var CHAT_TYPE_MSG = "msg"             //返回的文本信息
 
 type ChatStream struct {
 	Type     string      `json:"type"`
 	Body     interface{} `json:"body"`
-	Seqno    string      `json:"seqno"`
+	Seqno    string      `json:"seqno"` //流式输出时，用于前端区分完整的语句，相同seqno表示同一次llm输出
 	Room     string      `json:"room"`
 	ChatType string      `json:"chat_type"`
 }

@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  
+  <link href="/output.css" rel="stylesheet">
+  
+  <script>  
+    window.addEventListener("load", function(evt) {
+      var chatroom = "shop";
+      var my_menu1 = document.getElementById("menu1");
+      var shop_output = document.getElementById("shop_output");
+      
+
+      var mysubstr = function(str,len){
+        if(str.length > len){
+          str = str.substr(0,len)+"..."
+        }
+        return str
+      }
+
+        var input = document.getElementById("input");
+        var ws;
+        ws = null;
+        
+        var initShopRoom = false;
+
+        var print = function(cur_room,message) {
+            var d = document.createElement("div");
+            d.className="content"
+            d.textContent = message;
+            var output = document.getElementById(cur_room+"_output");
+            output.appendChild(d);
+            output.scroll(0, output.scrollHeight);
+        };
+
+        var printHTML = function(cur_room,inner_html){
+          var d = document.createElement("div");
+            d.innerHTML=inner_html;
+            var output = document.getElementById(cur_room+"_output");
+            output.appendChild(d);
+            output.scroll(0, output.scrollHeight);
+        }
+    
+        var printCandidate = function(cur_room,details) {
+            if(details.length <=0){
+              return false;
+            }
+            var d = document.createElement("div");
+            d.className="flex flex-nowrap overflow-auto h-44  mt-2";
+            for (let i = 0; i < details.length; ++i) {
+              var candidate = document.createElement("div");
+              candidate.className="w-96  h-40 min-w-96 min-h-40 border overflow-y-auto  m-2 border-gray-200 ";
+              var title = document.createElement("div");
+              title.className = "w-[370px] pl-2 font-bold text-xl text-left ";
+              if(details[i].link.length > 0){
+                title.innerHTML="<a href=\""+details[i].link+"\" target=\"_blank\">"+mysubstr(details[i].title,16)+"<a>";
+              }else{
+                title.textContent=mysubstr(details[i].title,16);
+              }
+              
+              
+              var cont = document.createElement("div");
+              cont.className="w-[370px]  text-left pl-2  h-32 ";
+              cont.textContent = mysubstr(details[i].snippet,154);
+              candidate.appendChild(title);
+              candidate.appendChild(cont);
+              d.appendChild(candidate);  
+            }
+            var output = document.getElementById(cur_room+"_output");
+            output.appendChild(d);
+            output.scroll(0, output.scrollHeight);
+        };
+    
+        document.getElementById("clean").onclick = function(evt) {
+            var output = document.getElementById(chatroom+"_output");
+            output.innerHTML="";
+        }
+    
+        function checkWebSocket() {
+            
+            if (ws) {
+                if (ws.readyState == WebSocket.CONNECTING || ws.readyState == WebSocket.OPEN){
+                    //print("======链接服务器中...=====");
+                    return false;
+                }else{
+                    //print("======重建链接中...=====");
+                }
+                
+            }
+            ws = new WebSocket("wss://{{.chat_server}}/chat/stream");
+            //ws.setRequestHeader("Cookie", "{{.cookie_key}}={{.cookie_value}}");
+            ws.onopen = function(evt) {
+                //print("******已链接....******");
+                
+                if(!initShopRoom){
+                  ws.send("{\"room\":\"shop\",\"history\":\"history\"}");
+                  initShopRoom = true;
+                }
+                if(input.value != ""){
+                    printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>"+input.value+"</div>");
+                    ws.send("{\"room\":\""+chatroom+"\",\"input\":\""+input.value+"\"}");
+                    input.value="";
+                }
+    
+            }
+            ws.onclose = function(evt) {
+                printHTML(chatroom,"<div class=\"border-b-2 border-gray-500 m-4\"></div>");
+                document.getElementById("send").disabled = false;
+                ws = null;
+            }
+            ws.onmessage = function(evt) {
+                //alert(evt.data)
+                var msg = JSON.parse(evt.data)
+                if(msg.type=="candidate"){
+                    printCandidate(msg.room,msg.body);
+                }else if(msg.type=="msg"){
+                    var msg_div = document.getElementById("msg_"+msg.seqno);
+                    if(msg_div == null){
+                      msg_div = document.createElement("div");
+                      msg_div.id = "msg_"+msg.seqno;
+                      msg_div.innerHTML=msg.body;
+                      msg_div.className = "text-left border-1 mt-2 bg-gray-100 rounded  p-2";
+                      var output = document.getElementById(msg.room+"_output");
+                      output.appendChild(msg_div);
+                      output.scroll(0, output.scrollHeight);
+                    }else{
+                      msg_div.innerHTML+=msg.body;
+                      var output = document.getElementById(msg.room+"_output");
+                      output.scroll(0, output.scrollHeight);
+                    }
+                    //print("" + msg.body);
+                }else if(msg.type=="tokens"){
+                    //print();
+                    printHTML(msg.room,"<div class=\"border-b-2 border-gray-500 m-4\">[tokens:] "+ msg.body+"</div>");
+                    printHTML(msg.room,"<div class=\"border-b-2 border-gray-500 m-4\"></div>");
+                    document.getElementById("send").disabled = false;
+                }else{
+                    //print("[unknown]" + evt.data);
+                    printHTML(msg.room,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>err</div>");
+                }
+                
+              
+            }
+            ws.onerror = function(evt) {
+                //print("ERROR: " + evt.data);
+                printHTML(chatroom,"<div class=\"border-b-2 border-gray-500 m-4\"></div>");
+                ws.close();
+            }
+            return false;
+        }
+        document.getElementById("send").onclick = function(evt) {
+            if(input.value == ""){
+                return false;
+            }
+            document.getElementById("send").disabled = true;
+            if (!ws) {
+                checkWebSocket();
+            }
+            if (ws.readyState == WebSocket.CONNECTING){
+                //print("======链接服务器中...=====");
+            }else if(ws.readyState == WebSocket.OPEN){
+                if(input.value != ""){
+                    printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>"+input.value+"</div>");
+                    ws.send("{\"room\":\""+chatroom+"\",\"input\":\""+input.value+"\"}");
+                    input.value="";
+                }
+            }else{
+                printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>请重新发送</div>");
+                document.getElementById("send").disabled = false;
+            }
+            return false;
+        };
+        document.getElementById("close").onclick = function(evt) {
+            printHTML(chatroom,"<div class='text-left border-1 mt-2 bg-gray-100 rounded  p-2'>中断</div>");
+            if (!ws) {
+                return false;
+            }
+            ws.close();
+            return false;
+        };
+
+
+        //发起查询
+        checkWebSocket();
+    });
+    </script>
+</head>
+<body class="text-center">
+  
+  <div class="flex items-center justify-center bg-gray-50">
+    <div class="w-1/4 h-screen bg-gray-100 border-4 rounded overflow-auto">
+        <ul class="p-6">
+          <li id="menu1" class="cur_menu hover:bg-gray-300" >购物助手</li>
+        </ul>
+    </div>
+    <div class="h-screen border-4 w-3/4 flex flex-col">
+      <!-- 上边区域 -->
+      <div id="shop_output"  class=" border-2 flex-1 bg-gray-50 border-gray-100 rounded p-10  overflow-auto ">
+          
+      </div>
+      
+      <!-- 下边区域，高度固定为 50px -->
+      <div class="h-40 bg-gray-50 border-2 text-center  border-gray-200 ">
+        <div class="flex flex-row items-center justify-center align-middle p-4">
+          <div ><button id="clean" class="p-2 border-2 rounded m-4 bg-gray-300  hover:bg-gray-500">清空</button></div>
+          <div >
+            <button id="close" class="p-2 m-4  border-2 rounded bg-red-300  hover:bg-red-500 ">停止</button>
+          </div>
+          <div >
+            <input id="input" type="text" size="60" class="hover:border-gray-400 h-16 border-2 rounded">
+          </div>
+          <div >
+            <button id="send" class="p-2 m-4  border-2 rounded bg-gray-300 hover:bg-gray-500">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+</body>
+
+</html>

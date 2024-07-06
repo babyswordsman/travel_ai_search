@@ -185,14 +185,15 @@ func TestSearchIndex(t *testing.T) {
 	took := int(r["took"].(float64))
 	t.Log("hits:", hits, ",took:", took)
 	// Print the ID and document source for each hit.
-	docs := make([]*detail.SkuDocument, 0)
+	docs := make([]*detail.SkuDocumentResp, 0)
 	for _, hit := range r["hits"].(map[string]interface{})["hits"].([]interface{}) {
 		id := hit.(map[string]interface{})["_id"]
 		source := hit.(map[string]interface{})["_source"]
-
+		score := hit.(map[string]interface{})["_score"]
 		skuDoc := detail.EsTransferSku(source.(map[string]interface{}))
 
 		skuDoc.Id = id.(string)
+		skuDoc.Score = score.(float64)
 		docs = append(docs, skuDoc)
 	}
 

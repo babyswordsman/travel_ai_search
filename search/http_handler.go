@@ -16,9 +16,10 @@ import (
 	"travel_ai_search/search/llm/dashscope"
 	"travel_ai_search/search/llm/spark"
 	"travel_ai_search/search/manage"
-	"travel_ai_search/search/manage/shopping"
+	datashop "travel_ai_search/search/manage/shopping"
 	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
+	shopping "travel_ai_search/search/shopping"
 	"travel_ai_search/search/user"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,7 @@ func InitData(c *gin.Context) {
 	// c.JSON(http.StatusOK, gin.H{
 	// 	"num": num,
 	// })
-	shopping.LoadFile("./data/shopping_test_data.csv")
+	datashop.ParseSkuData("./data/jd.txt")
 }
 
 func PrintChatPrompt(c *gin.Context) {
@@ -68,7 +69,50 @@ func PrintChatPrompt(c *gin.Context) {
 		"prompt": resp,
 	})
 }
+func dealShoppingRequest(curUser user.User, msgData map[string]string, msgListener chan string) {
+	go func(userInfo user.User, room string, query string) {
+		defer func() {
+			if err := recover(); err != nil {
+				logger.Errorf("panic err is %s \r\n %s", err, common.GetStack())
+			}
 
+		}()
+		tokens := int64(0)
+		if logger.IsLevelEnabled(logger.DebugLevel) {
+			logger.Debugf("[%s] query:%s", curUser.UserId, query)
+		}
+		engine := shopping.ShoppingEngine{}
+		answer, err := engine.Flow(curUser, room, query)
+		if err != nil {
+			logger.Errorf("[%s] query:%s err:%s", curUser.UserId, query, err.Error())
+			answer = "我好像碰到点问题，再试试问我吧"
+		}
+		if logger.IsLevelEnabled(logger.DebugLevel) {
+			logger.Debugf("[%s] answer:%s", curUser.UserId, answer)
+		}
+		msgResp := llm.ChatStream{
+			Type:     llm.CHAT_TYPE_MSG,
+			Body:     answer,
+			Room:     room,
+			ChatType: string(llms.ChatMessageTypeAI),
+			Seqno:    fmt.Sprintf("%d", time.Now().UnixMilli()),
+		}
+
+		v, _ := json.Marshal(msgResp)
+		msgListener <- string(v)
+		//todo:临时
+		tokens = int64(len(answer))
+
+		contentResp := llm.ChatStream{
+			ChatType: string(llms.ChatMessageTypeAI),
+			Room:     room,
+			Type:     llm.CHAT_TYPE_TOKENS,
+			Body:     tokens,
+		}
+		v, _ = json.Marshal(contentResp)
+		msgListener <- string(v)
+	}(curUser, string(msgData["room"]), string(msgData["input"]))
+}
 func dealChatRequest(curUser user.User, msgData map[string]string, msgListener chan string) {
 	go func(userInfo user.User, room string, query string) {
 		defer func() {
@@ -257,7 +301,13 @@ func ChatStream(ctx *gin.Context) {
 					//阻塞式
 					dealChatHistory(curUser, msgData, msgListener)
 				} else if _, ok := msgData["input"]; ok {
-					dealChatRequest(curUser, msgData, msgListener)
+					//curUser, string(msgData["room"]), string(msgData["input"]
+					if msgData["room"] == shopping.SHOPPING_ROOM {
+						dealShoppingRequest(curUser, msgData, msgListener)
+					} else {
+						dealChatRequest(curUser, msgData, msgListener)
+					}
+
 				}
 
 				break
@@ -312,6 +362,18 @@ func Index(c *gin.Context) {
 		cookie = ""
 	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
+		"chat_server":  template.JSEscapeString(conf.GlobalConfig.ChatAddr),
+		"cookie_key":   conf.GlobalConfig.CookieSession,
+		"cookie_value": cookie,
+	})
+}
+
+func Shop(c *gin.Context) {
+	cookie, err := c.Cookie(conf.GlobalConfig.CookieSession)
+	if err != nil {
+		cookie = ""
+	}
+	c.HTML(http.StatusOK, "shopping.html", gin.H{
 		"chat_server":  template.JSEscapeString(conf.GlobalConfig.ChatAddr),
 		"cookie_key":   conf.GlobalConfig.CookieSession,
 		"cookie_value": cookie,
