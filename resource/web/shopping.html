@@ -90,7 +90,9 @@
               
               var cont = document.createElement("div");
               cont.className="w-[370px]  text-left pl-2  h-[500px] ";
-              cont.innerHTML ="<img width=\"200px\" height=\"200px\" src=\""+details[i].product_main_pic+"\" /> <br />"+ "<span class='text-xl red bg-gray-300'>推荐理由</span>："+details[i].reason+"<br />"+"推荐分数："+details[i].score;
+              cont.innerHTML ="<img width=\"200px\" height=\"200px\" src=\""+details[i].product_main_pic
+              +"\" /> <br />"+ "<span class='text-xl red bg-gray-300'>recommend reaseon</span>："+details[i].reason+"<br />"
+              +"recommend score："+details[i].score+" &nbsp;&nbsp;&nbsp;&nbsp; Aisle:"+details[i].aisle;
               candidate.appendChild(title);
               candidate.appendChild(cont);
               d.appendChild(candidate);  

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
+	"travel_ai_search/search/es"
 	initclients "travel_ai_search/search/init_clients"
 	"travel_ai_search/search/quickwit"
 	"travel_ai_search/search/shopping/detail"
@@ -82,4 +83,30 @@ func TestSearchSku(t *testing.T) {
 		t.Error("search err", err.Error())
 	}
 	t.Log(string(v))
+}
+
+func TestParseWalmartSku(t *testing.T) {
+	logger.SetLevel(logger.DebugLevel)
+	path := common.GetTestConfigPath()
+	t.Log("config path：", path)
+	config, err := conf.ParseConfig(path)
+	if err != nil {
+		t.Error("parse config err ", err.Error())
+		return
+	}
+	conf.GlobalConfig = config
+	initclients.Start_client(config)
+	defer initclients.Stop_client()
+
+	projectRoot := common.GetProjectPath()
+	delInfo, err := es.GetInstance().DeleteIndex("wal_sku")
+	if err != nil {
+		t.Error("delete index wal_sku err ", err.Error())
+		return
+	} else {
+		t.Logf("delete index %s", delInfo)
+	}
+
+	total := LoadWalmartSkuFiles(projectRoot + "/data/walmart")
+	t.Logf("add sku :%d", total)
 }

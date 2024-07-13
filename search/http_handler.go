@@ -20,6 +20,7 @@ import (
 	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
 	shopping "travel_ai_search/search/shopping"
+	"travel_ai_search/search/shopping/walmart"
 	"travel_ai_search/search/user"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,8 @@ func InitData(c *gin.Context) {
 	// c.JSON(http.StatusOK, gin.H{
 	// 	"num": num,
 	// })
-	datashop.ParseSkuData("./data/jd.txt")
+	//datashop.ParseSkuData("./data/jd.txt")
+	datashop.LoadWalmartSkuFiles("./data/walmart")
 }
 
 func PrintChatPrompt(c *gin.Context) {
@@ -81,7 +83,7 @@ func dealShoppingRequest(curUser user.User, msgData map[string]string, msgListen
 		if logger.IsLevelEnabled(logger.DebugLevel) {
 			logger.Debugf("[%s] query:%s", curUser.UserId, query)
 		}
-		engine := shopping.ShoppingEngine{}
+		engine := walmart.ShoppingEngine{}
 		msgType, answer, err := engine.Flow(curUser, room, query)
 		if err != nil {
 			logger.Errorf("[%s] query:%s err:%s", curUser.UserId, query, err.Error())

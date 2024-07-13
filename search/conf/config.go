@@ -16,13 +16,16 @@ type SparkLLM struct {
 }
 
 type PromptTemplate struct {
-	ChatPrompt           string `yaml:"chat_prompt"`
-	TravelPrompt         string `yaml:"travel_prompt"`
-	QueryRewritingPrompt string `yaml:"query_rewriting_prompt"`
-	QueryRoute           string `yaml:"query_route"`
-	AdditionalInfo       string `yaml:"additional_information"`
-	SearchCondition      string `yaml:"search_condition"`
-	SkuRecommend         string `yaml:"sku_recommend"`
+	ChatPrompt            string `yaml:"chat_prompt"`
+	TravelPrompt          string `yaml:"travel_prompt"`
+	QueryRewritingPrompt  string `yaml:"query_rewriting_prompt"`
+	QueryRoute            string `yaml:"query_route"`
+	AdditionalInfo        string `yaml:"additional_information"`
+	SearchCondition       string `yaml:"search_condition"`
+	SkuRecommend          string `yaml:"sku_recommend"`
+	WalmartAdditionalInfo string `yaml:"walmart_additional_information"`
+	WalmartQueryRoute     string `yaml:"walmart_query_route"`
+	WalmartSkuRecommend   string `yaml:"walmart_sku_recommend"`
 }
 
 type DashScopeLLM struct {
