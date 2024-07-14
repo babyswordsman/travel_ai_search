@@ -35,6 +35,7 @@ import (
 type ChatRequest struct {
 	Context string `json:"context"`
 	Query   string `json:"query" binding:"required"`
+	Format  string `json:"format"`
 }
 
 func InitData(c *gin.Context) {
@@ -356,16 +357,23 @@ func Voice(ctx *gin.Context) {
 		})
 	case llm.CHAT_TYPE_SHOPPING:
 		resp := answer.([]*detail.RecommendWalmartSkuResponse)
-		var buf strings.Builder
-		for i, sku := range resp {
-			buf.WriteString(fmt.Sprintf("no.%d,recommend product name:%s,recommend score:%.f,Aisle:%s,price:%.2f.", i+1, sku.ProductName, sku.Score, sku.Aisle, sku.ProductPrice))
-			if i >= 2 {
-				break
+		if req.Format == "more" {
+			ctx.JSON(http.StatusOK, gin.H{
+				"answer": resp,
+			})
+		} else {
+			var buf strings.Builder
+			for i, sku := range resp {
+				buf.WriteString(fmt.Sprintf("no.%d, recommend product name:%s, recommend score:%.f, Aisle:%s, price:%.2f. ", i+1, sku.ProductName, sku.Score, sku.Aisle, sku.ProductPrice))
+				if i >= 2 {
+					break
+				}
 			}
+			ctx.JSON(http.StatusOK, gin.H{
+				"answer": buf.String(),
+			})
 		}
-		ctx.JSON(http.StatusOK, gin.H{
-			"answer": buf.String(),
-		})
+
 	default:
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"err": "error type",
