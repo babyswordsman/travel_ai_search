@@ -8,9 +8,11 @@ import (
 	"time"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
+	"travel_ai_search/search/es"
 	initclients "travel_ai_search/search/init_clients"
 	"travel_ai_search/search/llm"
 	llmutil "travel_ai_search/search/llm"
+	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/shopping/detail"
 	"travel_ai_search/search/user"
 
@@ -212,4 +214,126 @@ func TestShoppingRecommend(t *testing.T) {
 	} else {
 		t.Log("result:", res)
 	}
+}
+
+func TestSearchWalmartIndex(t *testing.T) {
+	logger.SetLevel(logger.DebugLevel)
+	logger.SetReportCaller(true)
+	path := common.GetTestConfigPath()
+	t.Log("config path：", path)
+	config, err := conf.ParseConfig(path)
+	if err != nil {
+		t.Error("parse config err ", err.Error())
+		return
+	}
+	conf.GlobalConfig = config
+	initclients.Start_client(config)
+	defer initclients.Stop_client()
+
+	engine := ShoppingEngine{}
+	//Content: {"Complete information":"The user is asking for recommendations for low-calorie snacks.", "Question 1":1, "Question 2":"Snacks", "Question 3":"Low-calorie snacks", "Question 4":{"Brand": "", "Calories per serving": "Low", "Ingredients": ["Natural", "Healthy", "Low-fat"], "Flavors": ["Crunchy", "Sweet", "Savory"], "Allergen-free": "", "Dietary restrictions": ["Vegetarian", "Vegan"]}}
+	//
+	shoppingIntentJson := `{"Complete information":"The user is looking to purchase crispy cookies.","Question 1":1,"Question 2":"Food & Grocery > Snacks > Baked Goods > Cookies","Question 3":"Crispy Cookies","Question 4":{"Brand": "", "Flavor": "Crispy", "Texture": "Chewy", "Type": "Biscotti or Shortbread", "Ingredients": "小麦，糖，黄油，可能含有鸡蛋和乳制品", "Allergens": ["Gluten", "Dairy (if not vegan)"], "Certifications": "", "Net Weight": "100g", "Package Size": "1 pack", "Price": "$3.99", "Availability": "In stock"}}`
+	intentMap := make(map[string]any)
+	json.Unmarshal([]byte(shoppingIntentJson), &intentMap)
+	intent := engine.parseIntent(intentMap)
+
+	matchs := make([]map[string]any, 0)
+	if len(intent.ProductName) > 0 {
+		matchs = append(matchs, map[string]any{"match": map[string]any{
+			"Name": map[string]any{"query": intent.ProductName, "boost": 1},
+		}})
+		matchs = append(matchs, map[string]any{"match": map[string]any{
+			"ShortDescription": map[string]any{"query": intent.ProductName,
+				"boost": 0.1},
+		}})
+
+		matchs = append(matchs, map[string]any{"match": map[string]any{
+			"LongDescription": map[string]any{"query": intent.ProductName,
+				"boost": 0.1},
+		}})
+	}
+	if len(intent.Category) > 0 {
+		matchs = append(matchs, map[string]any{"match": map[string]any{
+			"CategoryPath": map[string]any{"query": intent.Category,
+				"boost": 0.05},
+		}})
+
+	}
+	query := strings.TrimSpace(intent.IndependentQuery)
+	if len(query) == 0 {
+		query = intent.ProductName
+	}
+
+	embs, err := modelclient.GetInstance().QueryEmbedding([]string{query})
+	if err != nil {
+		t.Error(err.Error(), len(embs))
+	}
+	//TODO:使用属性进行匹配,目前ES索引没有使用嵌套或者object结构，不能进行嵌套查询
+
+	queryStruct := map[string]any{
+		"size":   10,
+		"fields": []string{"ItemId", "Timestamp", "Aisle", "ParentItemId", "Color", "MediumImage", "Name", "BrandName", "CategoryPath", "SalePrice", "ShortDescription", "LongDescription"},
+		"query": map[string]any{
+			"bool": map[string]any{
+				"should": matchs,
+			},
+		},
+		"knn": map[string]any{
+			"field":          "DescVector",
+			"k":              5,
+			"num_candidates": 20,
+			"boost":          10,
+			"query_vector":   embs[0],
+		},
+	}
+
+	r, err := es.GetInstance().SearchIndex(SHOPPING_INDEX_NAME, queryStruct)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	// Print the response status, number of results, and request duration.
+	hits := int(r["hits"].(map[string]interface{})["total"].(map[string]interface{})["value"].(float64))
+	took := int(r["took"].(float64))
+	t.Log("hits:", hits, ",took:", took)
+	// Print the ID and document source for each hit.
+	docs := make([]*detail.WalmartSkuResp, 0)
+	for _, hit := range r["hits"].(map[string]interface{})["hits"].([]interface{}) {
+		id := hit.(map[string]interface{})["_id"]
+		source := hit.(map[string]interface{})["_source"]
+		score := hit.(map[string]interface{})["_score"]
+		skuDoc := detail.EsToWalmartSku(source.(map[string]interface{}))
+
+		skuDoc.Id = id.(string)
+		skuDoc.Score = score.(float64)
+		docs = append(docs, &skuDoc)
+	}
+
+	if len(docs) == 0 {
+		t.Errorf("empty docs")
+	}
+	for _, doc := range docs {
+		t.Logf("id:%s,score:%f,name:%s", doc.Id, doc.Score, doc.Name)
+	}
+}
+
+func TestGetIndexInfo(t *testing.T) {
+	logger.SetLevel(logger.DebugLevel)
+	logger.SetReportCaller(true)
+	path := common.GetTestConfigPath()
+	t.Log("config path：", path)
+	config, err := conf.ParseConfig(path)
+	if err != nil {
+		t.Error("parse config err ", err.Error())
+		return
+	}
+	conf.GlobalConfig = config
+	initclients.Start_client(config)
+	defer initclients.Stop_client()
+
+	str, err := es.GetInstance().GetIndex(SHOPPING_INDEX_NAME)
+	if err != nil {
+		t.Error("get index err:", err.Error())
+	}
+	t.Log(str)
 }

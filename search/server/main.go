@@ -89,6 +89,7 @@ func init_router(r *gin.Engine) {
 
 		chat_route.POST("/chat_prompt", search.PrintChatPrompt)
 		chat_route.GET("/chat", search.Index)
+		chat_route.POST("/voice", search.Voice)
 		chat_route.GET("/shopping", search.Shop)
 		chat_route.GET("/chat/stream", search.ChatStream)
 		chat_route.GET("/home", search.Home)

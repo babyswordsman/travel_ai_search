@@ -185,7 +185,12 @@ func (client *ESClient) SearchIndex(index string, query map[string]any) (map[str
 	}
 
 	if logger.IsLevelEnabled(logger.DebugLevel) {
-		logger.Debugf("es [%s] query:%s", index, buf.String())
+		if buf.Len() > 500 {
+			logger.Debugf("es [%s] query:%s ...", index, string(buf.String()[:100]))
+		} else {
+			logger.Debugf("es [%s] query:%s", index, buf.String())
+		}
+
 	}
 	// Perform the search request.
 	res, err := client.cli.Search(

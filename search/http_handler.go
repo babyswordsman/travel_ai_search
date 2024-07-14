@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
@@ -20,6 +21,7 @@ import (
 	"travel_ai_search/search/rewrite"
 	searchengineapi "travel_ai_search/search/search_engine_api"
 	shopping "travel_ai_search/search/shopping"
+	"travel_ai_search/search/shopping/detail"
 	"travel_ai_search/search/shopping/walmart"
 	"travel_ai_search/search/user"
 
@@ -325,32 +327,51 @@ func ChatStream(ctx *gin.Context) {
 
 }
 
-func Chat(c *gin.Context) {
+func Voice(ctx *gin.Context) {
 
 	req := ChatRequest{}
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		logger.Errorf("parse {%s} err:%s", c.GetString(gin.BodyBytesKey), err)
-		c.JSON(http.StatusOK, gin.H{
-			"prompt": conf.ErrHint,
+	if err := ctx.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		logger.Errorf("parse {%s} err:%s", ctx.GetString(gin.BodyBytesKey), err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"err": conf.ErrHint,
+		})
+		return
+	}
+	curUser := user.GetCurUser(ctx)
+
+	engine := walmart.ShoppingEngine{}
+	msgType, answer, err := engine.Flow(curUser, "shop", req.Query)
+	if err != nil {
+		logger.Errorf("flow err:%s", err.Error())
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"err": conf.ErrHint,
 		})
 		return
 	}
 
-	engine := &ChatEngine{
-		SearchEngine: &searchengineapi.LocalSearchEngine{},
-		Prompt: &llm.TravelPrompt{
-			MaxLength:    1024,
-			PromptPrefix: conf.GlobalConfig.PromptTemplate.TravelPrompt,
-		},
-		Model: &spark.SparkModel{},
+	switch msgType {
+	case llm.CHAT_TYPE_MSG:
+		ctx.JSON(http.StatusOK, gin.H{
+			"answer": answer,
+		})
+	case llm.CHAT_TYPE_SHOPPING:
+		resp := answer.([]*detail.RecommendWalmartSkuResponse)
+		var buf strings.Builder
+		for i, sku := range resp {
+			buf.WriteString(fmt.Sprintf("no.%d,recommend product name:%s,recommend score:%.f,Aisle:%s,price:%.2f.", i+1, sku.ProductName, sku.Score, sku.Aisle, sku.ProductPrice))
+			if i >= 2 {
+				break
+			}
+		}
+		ctx.JSON(http.StatusOK, gin.H{
+			"answer": buf.String(),
+		})
+	default:
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"err": "error type",
+		})
 	}
-	//logger.WithField("req", c.GetString(gin.BodyBytesKey)).Info("request chat ")
-	resp, tokens := engine.LLMChat(req.Query)
-	logger.WithField("req", c.GetString(gin.BodyBytesKey)).WithField("chat", resp).Info("request chat")
-	c.JSON(http.StatusOK, gin.H{
-		"chat":        resp,
-		"totalTokens": tokens,
-	})
+
 }
 
 func Home(c *gin.Context) {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"travel_ai_search/search/es"
+	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/shopping/detail"
 
 	logger "github.com/sirupsen/logrus"
@@ -175,42 +176,49 @@ var walmart_sku_index_mapping string = `
 	},
 	  "mappings": {
 		"properties": {
-		  "timestamp": {
+		  "Timestamp": {
 			"type":"date","format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
 		  },
-		  "aisle":{
+		  "Aisle":{
 		  	"type":"keyword"
 		  },
-		  "parentItemId":{
+		  "ParentItemId":{
 		  	"type": "long"
 		  },
-		  "color": {
+		  "Color": {
 			"type":"keyword"
 		  },
-		  "mediumImage": {
+		  "MediumImage": {
 			"type": "keyword"
 		  },
-		  "name": {
+		  "Name": {
 			"type": "text",
 			"analyzer": "std_analyzer"
 		  },
-		  "brandName": {
+		  "BrandName": {
 			"type": "keyword"
 		  },
-		  "categoryPath": {
+		  "CategoryPath": {
 			"type": "text",
 			"analyzer": "std_analyzer"
 		  },
-		  "salePrice": {
+		  "SalePrice": {
 			"type": "double"
 		  },
-		  "shortDescription": {
+		  "ShortDescription": {
 			"type": "text",
 			"analyzer": "std_analyzer"
 		  },
-		  "longDescription": {
+		  "LongDescription": {
 			"type": "text",
 			"analyzer": "std_analyzer"
+		  },
+		  "DescVector": {
+			"type": "dense_vector",
+			"dims": 768,
+			"index_options": {
+                "type": "hnsw"
+            }
 		  }
 		}
 	  }
@@ -274,13 +282,17 @@ func ParseWalmartSkuData(path string) int32 {
 	}
 
 	items := respMap["items"].([]any)
-	rand.Seed(time.Now().UnixMilli())
 	for _, itemMap := range items {
 		randomNumber := rand.Intn(10) + 1
 		itemMapNew := itemMap.(map[string]any)
 		itemMapNew["aisle"] = fmt.Sprintf("A%d", randomNumber)
 		skuDoc := detail.ParseWalmartSku(itemMapNew)
-
+		dense, err := modelclient.GetInstance().PassageEmbedding([]string{skuDoc.Name + " \r\n" + skuDoc.ShortDescription})
+		if err != nil {
+			logger.Errorf("get passage emb err:%s", err.Error())
+			continue
+		}
+		skuDoc.DescVector = dense[0]
 		buf, err := json.Marshal(skuDoc)
 
 		if err != nil {

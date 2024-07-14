@@ -15,6 +15,7 @@ type WalmartSku struct {
 	SalePrice        float64
 	ShortDescription string
 	LongDescription  string
+	DescVector       []float32
 }
 
 type RecommendWalmartSkuResponse struct {

@@ -14,6 +14,7 @@ import (
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/es"
 	llmutil "travel_ai_search/search/llm"
+	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/shopping/detail"
 	"travel_ai_search/search/user"
 
@@ -145,30 +146,30 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 
 	//TODO:需要做相似性截断
 
-	if len(shoppingIntent.ProductName) > 0 && len(shoppingIntent.ProductProps) == 0 {
-		hitThreshold := 20
-		if resp.NumHits > hitThreshold {
-			//商品比较多，可以建议用户细化需求
-			//TODO:如果用户已经交互多次了，就不要再细化了，直接推荐
-			independentQuery := shoppingIntent.IndependentQuery
-			if len(shoppingIntent.IndependentQuery) == 0 {
-				independentQuery = query
-			}
-			if logger.IsLevelEnabled(logEntry.Level) {
-				logEntry.Debugf("prepare generate advice for user,independentQuery:%s", independentQuery)
-			}
-			advice, err := engine.askUser(independentQuery, curUser, resp.Hits)
+	// if len(shoppingIntent.ProductName) > 0 && len(shoppingIntent.ProductProps) == 0 {
+	// 	hitThreshold := 20
+	// 	if resp.NumHits > hitThreshold {
+	// 		//商品比较多，可以建议用户细化需求
+	// 		//TODO:如果用户已经交互多次了，就不要再细化了，直接推荐
+	// 		independentQuery := shoppingIntent.IndependentQuery
+	// 		if len(shoppingIntent.IndependentQuery) == 0 {
+	// 			independentQuery = query
+	// 		}
+	// 		if logger.IsLevelEnabled(logEntry.Level) {
+	// 			logEntry.Debugf("prepare generate advice for user,independentQuery:%s", independentQuery)
+	// 		}
+	// 		advice, err := engine.askUser(independentQuery, curUser, resp.Hits)
 
-			if err != nil {
-				logEntry.Error("gen advice error:", err.Error())
-				return llmutil.CHAT_TYPE_MSG, "", err
-			}
-			engine.saveChatHistory(curUser, room, query, advice)
-			return llmutil.CHAT_TYPE_MSG, advice, nil
-		} else {
-			logEntry.Infof("hit sku less than %d", hitThreshold)
-		}
-	}
+	// 		if err != nil {
+	// 			logEntry.Error("gen advice error:", err.Error())
+	// 			return llmutil.CHAT_TYPE_MSG, "", err
+	// 		}
+	// 		engine.saveChatHistory(curUser, room, query, advice)
+	// 		return llmutil.CHAT_TYPE_MSG, advice, nil
+	// 	} else {
+	// 		logEntry.Infof("hit sku less than %d", hitThreshold)
+	// 	}
+	// }
 
 	//给用户推荐产品
 	independentQuery := shoppingIntent.IndependentQuery
@@ -176,9 +177,9 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 		//todo:全部上下文
 		independentQuery = query
 	}
-	str, err := engine.recommend(independentQuery, curUser, resp.Hits)
+	respSku, err := engine.recommend(independentQuery, curUser, resp.Hits)
 
-	return llmutil.CHAT_TYPE_SHOPPING, str, err
+	return llmutil.CHAT_TYPE_SHOPPING, respSku, err
 
 }
 
@@ -351,8 +352,8 @@ func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User,
 		skuBuf.WriteString(doc.Id)
 		skuBuf.WriteString(",product name:")
 		skuBuf.WriteString(doc.Name)
-		skuBuf.WriteString(",description:")
-		skuBuf.WriteString(doc.ShortDescription)
+		//skuBuf.WriteString(",description:")
+		//skuBuf.WriteString(doc.ShortDescription)
 		skuBuf.WriteString("\r\n")
 		idMap[doc.Id] = relDocs[i]
 	}
@@ -572,21 +573,33 @@ func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse
 	matchs := make([]map[string]any, 0)
 	if len(intent.ProductName) > 0 {
 		matchs = append(matchs, map[string]any{"match": map[string]any{
-			"Name": map[string]any{"query": intent.ProductName, "boost": 10},
+			"Name": map[string]any{"query": intent.ProductName, "boost": 1},
 		}})
 		matchs = append(matchs, map[string]any{"match": map[string]any{
-			"ShortDescription": intent.ProductName,
+			"ShortDescription": map[string]any{"query": intent.ProductName,
+				"boost": 0.1},
 		}})
 
 		matchs = append(matchs, map[string]any{"match": map[string]any{
-			"LongDescription": intent.ProductName,
+			"LongDescription": map[string]any{"query": intent.ProductName,
+				"boost": 0.1},
 		}})
 	}
 	if len(intent.Category) > 0 {
 		matchs = append(matchs, map[string]any{"match": map[string]any{
-			"CategoryPath": intent.Category,
+			"CategoryPath": map[string]any{"query": intent.Category,
+				"boost": 0.05},
 		}})
 
+	}
+	independentQuery := strings.TrimSpace(intent.IndependentQuery)
+	if len(independentQuery) == 0 {
+		independentQuery = intent.ProductName
+	}
+
+	embs, err := modelclient.GetInstance().QueryEmbedding([]string{independentQuery})
+	if err != nil {
+		return nil, fmt.Errorf("get query emb err")
 	}
 
 	//TODO:使用属性进行匹配,目前ES索引没有使用嵌套或者object结构，不能进行嵌套查询
@@ -594,12 +607,22 @@ func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse
 	if len(matchs) == 0 {
 		return nil, fmt.Errorf("search with intent,query is empty")
 	}
+	//TODO:使用属性进行匹配,目前ES索引没有使用嵌套或者object结构，不能进行嵌套查询
+
 	query := map[string]any{
-		"size": 3,
+		"size":   4,
+		"fields": []string{"ItemId", "Timestamp", "Aisle", "ParentItemId", "Color", "MediumImage", "Name", "BrandName", "CategoryPath", "SalePrice", "ShortDescription", "LongDescription"},
 		"query": map[string]any{
 			"bool": map[string]any{
 				"should": matchs,
 			},
+		},
+		"knn": map[string]any{
+			"field":          "DescVector",
+			"k":              2,
+			"num_candidates": 20,
+			"boost":          10,
+			"query_vector":   embs[0],
 		},
 	}
 	r, err := es.GetInstance().SearchIndex(SHOPPING_INDEX_NAME, query)
