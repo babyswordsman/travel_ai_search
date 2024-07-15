@@ -14,11 +14,11 @@ import (
 	"travel_ai_search/search/llm"
 	"travel_ai_search/search/user"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/gin-contrib/cors"
 	logger "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -70,7 +70,7 @@ func CheckSign(c *gin.Context) {
 }
 func init_router(r *gin.Engine) {
 	//r.GET("/", search.Index)
-
+	r.Use(cors.Default())
 	manage_route := r.Group("manage")
 	{
 		manage_route.GET("/init_data", search.InitData)
@@ -86,7 +86,7 @@ func init_router(r *gin.Engine) {
 
 	chat_route := r.Group("/")
 	chat_route.Use(sessions.SessionsMany([]string{conf.GlobalConfig.CookieSession}, store), CheckSign)
-	chat_route.Use(cors.Default())
+
 	{
 
 		chat_route.POST("/chat_prompt", search.PrintChatPrompt)
