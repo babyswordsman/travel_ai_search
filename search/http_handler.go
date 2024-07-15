@@ -342,6 +342,11 @@ func Voice(ctx *gin.Context) {
 
 	engine := walmart.ShoppingEngine{}
 	msgType, answer, err := engine.Flow(curUser, "shop", req.Query)
+	if err != nil || msgType == llm.CHAT_TYPE_MSG {
+		logger.Errorf("****plan b ")
+		msgType, answer, err = engine.PlanB(curUser, "shop", req.Query)
+	}
+
 	if err != nil {
 		logger.Errorf("flow err:%s", err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
@@ -350,10 +355,11 @@ func Voice(ctx *gin.Context) {
 		return
 	}
 
+	logger.Infof("flow msgtype:%s", msgType)
 	switch msgType {
 	case llm.CHAT_TYPE_MSG:
-		ctx.JSON(http.StatusOK, gin.H{
-			"answer": answer,
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"err": conf.ErrHint,
 		})
 	case llm.CHAT_TYPE_SHOPPING:
 		resp := answer.([]*detail.RecommendWalmartSkuResponse)
@@ -369,6 +375,7 @@ func Voice(ctx *gin.Context) {
 					break
 				}
 			}
+
 			ctx.JSON(http.StatusOK, gin.H{
 				"answer": buf.String(),
 			})

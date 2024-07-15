@@ -183,6 +183,52 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 
 }
 
+func (engine *ShoppingEngine) PlanB(curUser user.User, room, query string) (string, any, error) {
+
+	if len(query) > 512 {
+		query = query[:512]
+	}
+
+	logEntry := logger.WithField("uid", curUser.UserId)
+
+	logEntry.Infof("plan b query:%s", query)
+	shoppingIntent := ShoppingIntent{
+		IsShopping:       true,
+		Category:         "",
+		ProductName:      query,
+		ProductProps:     make(map[string]string),
+		IndependentQuery: query,
+	}
+
+	resp, err := engine.search(&shoppingIntent)
+	if err != nil {
+		logEntry.Error("search for shopping intent error:", err.Error())
+		//TODO: 出默认列表
+		return llmutil.CHAT_TYPE_MSG, "", nil
+	}
+
+	if len(resp.Hits) == 0 {
+		logEntry.Error("search for shopping intent hits empty")
+		//TODO:不返空，给几个其他的推荐
+		return llmutil.CHAT_TYPE_MSG, EMPTY_SHOPPING_HIT, nil
+	}
+
+	resultList := make([]*detail.RecommendWalmartSkuResponse, 0)
+	for _, sku := range resp.Hits {
+		var resp detail.RecommendWalmartSkuResponse
+		resp.ProductId = sku.Id
+		resp.Score = sku.Score
+		resp.Reason = sku.ShortDescription
+		resp.ProductName = sku.Name
+		resp.ProductMainPic = sku.MediumImage
+		resp.ProductPrice = sku.SalePrice
+		resp.Aisle = sku.Aisle
+		resultList = append(resultList, &resp)
+	}
+
+	return llmutil.CHAT_TYPE_SHOPPING, resultList, err
+}
+
 func (engine *ShoppingEngine) doLLM(logEntry *logger.Entry, llmChain *chains.LLMChain,
 	inputs map[string]any, ctx context.Context) (map[string]any, error) {
 
