@@ -18,6 +18,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gin-contrib/cors"
 	logger "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -85,6 +86,7 @@ func init_router(r *gin.Engine) {
 
 	chat_route := r.Group("/")
 	chat_route.Use(sessions.SessionsMany([]string{conf.GlobalConfig.CookieSession}, store), CheckSign)
+	chat_route.Use(cors.Default())
 	{
 
 		chat_route.POST("/chat_prompt", search.PrintChatPrompt)
