@@ -35,3 +35,5 @@ func TestStream(t *testing.T) {
 		t.Log("chan:", str)
 	}
 }
+
+

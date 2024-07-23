@@ -342,10 +342,6 @@ func Voice(ctx *gin.Context) {
 
 	engine := walmart.ShoppingEngine{}
 	msgType, answer, err := engine.Flow(curUser, "shop", req.Query)
-	if err != nil || msgType == llm.CHAT_TYPE_MSG {
-		logger.Errorf("****plan b ")
-		msgType, answer, err = engine.PlanB(curUser, "shop", req.Query)
-	}
 
 	if err != nil {
 		logger.Errorf("flow err:%s", err.Error())

@@ -182,6 +182,9 @@ var walmart_sku_index_mapping string = `
 		  "Aisle":{
 		  	"type":"keyword"
 		  },
+		  "ItemId":{
+		  	"type": "long"
+		  },
 		  "ParentItemId":{
 		  	"type": "long"
 		  },

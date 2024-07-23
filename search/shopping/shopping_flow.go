@@ -95,7 +95,7 @@ func (engine *ShoppingEngine) saveChatHistory(curUser user.User, room, query, re
 // type  shop or msg
 // body  product infor or text msg
 // error
-func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (string, any, error) {
+func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (llmutil.TaskOutputType, any, error) {
 	ctx := context.Background()
 	llm, err := NewDashScopeModel()
 	logEntry := logger.WithField("uid", curUser.UserId)
@@ -657,3 +657,5 @@ func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse
 	}
 	return resp, nil
 }
+
+

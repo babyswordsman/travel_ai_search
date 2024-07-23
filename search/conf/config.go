@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -16,16 +17,19 @@ type SparkLLM struct {
 }
 
 type PromptTemplate struct {
-	ChatPrompt            string `yaml:"chat_prompt"`
-	TravelPrompt          string `yaml:"travel_prompt"`
-	QueryRewritingPrompt  string `yaml:"query_rewriting_prompt"`
-	QueryRoute            string `yaml:"query_route"`
-	AdditionalInfo        string `yaml:"additional_information"`
-	SearchCondition       string `yaml:"search_condition"`
-	SkuRecommend          string `yaml:"sku_recommend"`
-	WalmartAdditionalInfo string `yaml:"walmart_additional_information"`
-	WalmartQueryRoute     string `yaml:"walmart_query_route"`
-	WalmartSkuRecommend   string `yaml:"walmart_sku_recommend"`
+	ChatPrompt              string `yaml:"chat_prompt"`
+	TravelPrompt            string `yaml:"travel_prompt"`
+	QueryRewritingPrompt    string `yaml:"query_rewriting_prompt"`
+	QueryRoute              string `yaml:"query_route"`
+	AdditionalInfo          string `yaml:"additional_information"`
+	SearchCondition         string `yaml:"search_condition"`
+	SkuRecommend            string `yaml:"sku_recommend"`
+	WalmartAdditionalInfo   string `yaml:"walmart_additional_information"`
+	WalmartShoppingIntent   string `yaml:"walmart_shopping_intent"`
+	WalmartSkuRecommend     string `yaml:"walmart_sku_recommend"`
+	AgentRouting            string `yaml:"agent_routing"`
+	WalmartExtractProductId string `yaml:"walmart_extract_product_id"`
+	WalmartChat             string `yaml:"walmart_chat"`
 }
 
 type DashScopeLLM struct {
@@ -33,6 +37,13 @@ type DashScopeLLM struct {
 	HostUrl   string `yaml:"host_url"`
 	OpenaiUrl string `yaml:"openai_url"`
 	Model     string `yaml:"model"`
+}
+
+type AgentInfo struct {
+	Name   string `yaml:"name"`
+	Desc   string `yaml:"desc"`
+	Param  string `yaml:"param"`
+	Output string `yaml:"output"`
 }
 
 type GoogleCustomSearch struct {
@@ -95,6 +106,8 @@ type Config struct {
 	DashScopeLLM   DashScopeLLM   `yaml:"dash_scope_llm"`
 	PromptTemplate PromptTemplate `yaml:"prompt_template"`
 
+	Agents map[string][]AgentInfo `yaml:"agents"`
+
 	GoogleCustomSearch GoogleCustomSearch `yaml:"google_custom_search"`
 	OpenSerpSearch     OpenSerpSearch     `yaml:"openserp_search"`
 }
@@ -129,3 +142,21 @@ func ParseConfig(configPath string) (*Config, error) {
 	}
 	return config, nil
 }
+
+func AgentTemplate(conf *Config, flowName string) string {
+	flowAgents, ok := conf.Agents[flowName]
+	if !ok {
+		return ""
+	}
+	var buf strings.Builder
+	for i, agent := range flowAgents {
+		if i > 0 {
+			buf.WriteString("\r\n")
+		}
+		info := fmt.Sprintf("%d:\n    agent name:%s;\n    description:%s;\n    parameters:%s。\n",
+			i+1, agent.Name, agent.Desc, agent.Param)
+		buf.WriteString(info)
+	}
+	return buf.String()
+}
+

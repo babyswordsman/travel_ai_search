@@ -19,7 +19,7 @@ type WalmartSku struct {
 }
 
 type RecommendWalmartSkuResponse struct {
-	ProductId      string  `json:"item_id"`
+	ProductId      string  `json:"product_id"`
 	Score          float64 `json:"score"`
 	Reason         string  `json:"reason"`
 	ProductMainPic string  `json:"product_main_pic"`

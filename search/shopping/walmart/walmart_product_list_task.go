@@ -2,14 +2,11 @@ package walmart
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 	"travel_ai_search/search/common"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/es"
@@ -21,12 +18,38 @@ import (
 	logger "github.com/sirupsen/logrus"
 	"github.com/tmc/langchaingo/callbacks"
 	"github.com/tmc/langchaingo/chains"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/prompts"
 )
 
-type ShoppingEngine struct {
+type WalmartProductListTask struct {
+	output []*detail.RecommendWalmartSkuResponse
+	status int
+}
+
+func (task *WalmartProductListTask) FormatOutput() string {
+	var buf strings.Builder
+	for i, sku := range task.output {
+		if i > 0 {
+			buf.WriteString("\r\n")
+		}
+		buf.WriteString(fmt.Sprintf("product id:%s, product name:%s, Aisle:%s, price:%.2f",
+			sku.ProductId, sku.ProductName, sku.Aisle, sku.ProductPrice))
+	}
+	return buf.String()
+	// if task.Status() != 1 {
+	// 	return ""
+	// }
+
+	// buf, err := json.Marshal(task.output)
+	// if err != nil {
+	// 	logger.Errorf("marshal err:%s", err.Error())
+	// 	return ""
+	// }
+	// return string(buf)
+}
+
+func (task *WalmartProductListTask) Status() int {
+	return task.status
 }
 
 type ShoppingIntent struct {
@@ -55,58 +78,22 @@ const SHOPPING_INDEX_NAME = "wal_sku"
 const UNMATCH_SHOPPING_HIT = `我不太清楚您的问题，我是一个购物小助手，请问我购物相关的问题吧`
 const EMPTY_SHOPPING_HIT = `暂时没有符合您要求的商品，可以想想还需要购买其他商品吗？`
 
-func NewDashScopeModel() (*openai.LLM, error) {
-	opts := make([]openai.Option, 0)
-	opts = append(opts, openai.WithBaseURL(conf.GlobalConfig.DashScopeLLM.OpenaiUrl))
-	opts = append(opts, openai.WithModel(conf.GlobalConfig.DashScopeLLM.Model))
-	opts = append(opts, openai.WithToken(conf.GlobalConfig.DashScopeLLM.Key))
-	opts = append(opts, openai.WithCallback(ShoppingFlowLogHandler{}))
-	llm, err := openai.New(opts...)
-	return llm, err
-}
-
-func (engine *ShoppingEngine) conversationContext(curUser user.User, room string) string {
-	chatHistorys := llmutil.GetHistoryStoreInstance().LoadChatHistoryForLLM(curUser.UserId, room)
-	var strBuilder strings.Builder
-	for i, msg := range chatHistorys {
-		role := ""
-		switch msg.GetType() {
-		case llms.ChatMessageTypeSystem:
-			role = llmutil.ROLE_SYSTEM
-		case llms.ChatMessageTypeHuman:
-			role = llmutil.ROLE_USER
-		default:
-			role = llmutil.ROLE_ASSISTANT
-		}
-		if i > 0 {
-			strBuilder.WriteString("\r\n")
-		}
-		strBuilder.WriteString(role)
-		strBuilder.WriteString(":")
-		strBuilder.WriteString(msg.GetContent())
-	}
-	return strBuilder.String()
-}
-
-func (engine *ShoppingEngine) saveChatHistory(curUser user.User, room, query, response string) {
-	llmutil.GetHistoryStoreInstance().AddChatHistory(curUser.UserId, room, query, response)
-}
-
 // return:
 // type  shop or msg
 // body  product infor or text msg
 // error
-func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (string, any, error) {
+func (task *WalmartProductListTask) Run(curUser user.User, room, query string) (llmutil.TaskOutputType, any, error) {
 	ctx := context.Background()
 	llm, err := NewDashScopeModel()
 	logEntry := logger.WithField("uid", curUser.UserId)
 	if err != nil {
 		logEntry.Errorf("create llm client err:%s", err.Error())
+		task.status = llmutil.RUN_ERR
 		return llmutil.CHAT_TYPE_MSG, "", err
 	}
 
 	defaultQAPromptTemplate := prompts.NewPromptTemplate(
-		conf.GlobalConfig.PromptTemplate.WalmartQueryRoute,
+		conf.GlobalConfig.PromptTemplate.WalmartShoppingIntent,
 		[]string{"context", "question"},
 	)
 
@@ -118,58 +105,34 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 	llmChain := chains.NewLLMChain(llm, prompt)
 	inputs := make(map[string]any)
 	inputs["question"] = query
-	inputs["context"] = engine.conversationContext(curUser, room)
+	inputs["context"] = conversationContext(curUser, room)
 
-	intentMap, err := engine.doLLM(logEntry, llmChain, inputs, ctx)
+	intentMap, err := doLLM(logEntry, llmChain, inputs, ctx)
 
 	if err != nil {
+		task.status = llmutil.RUN_ERR
 		return llmutil.CHAT_TYPE_MSG, "", common.Errorf("request intent err", err)
 	}
 
-	shoppingIntent := engine.parseIntent(intentMap)
+	shoppingIntent := task.parseIntent(intentMap)
 	if !shoppingIntent.IsShopping {
 		return llmutil.CHAT_TYPE_MSG, UNMATCH_SHOPPING_HIT, nil
 	}
 
-	resp, err := engine.search(&shoppingIntent)
+	resp, err := task.search(&shoppingIntent)
 	if err != nil {
 		logEntry.Error("search for shopping intent error:", err.Error())
+		task.status = llmutil.RUN_ERR
 		//TODO: 出默认列表
 		return llmutil.CHAT_TYPE_MSG, "", nil
 	}
 
 	if len(resp.Hits) == 0 {
 		logEntry.Error("search for shopping intent hits empty")
+		task.status = llmutil.RUN_ERR
 		//TODO:不返空，给几个其他的推荐
 		return llmutil.CHAT_TYPE_MSG, EMPTY_SHOPPING_HIT, nil
 	}
-
-	//TODO:需要做相似性截断
-
-	// if len(shoppingIntent.ProductName) > 0 && len(shoppingIntent.ProductProps) == 0 {
-	// 	hitThreshold := 20
-	// 	if resp.NumHits > hitThreshold {
-	// 		//商品比较多，可以建议用户细化需求
-	// 		//TODO:如果用户已经交互多次了，就不要再细化了，直接推荐
-	// 		independentQuery := shoppingIntent.IndependentQuery
-	// 		if len(shoppingIntent.IndependentQuery) == 0 {
-	// 			independentQuery = query
-	// 		}
-	// 		if logger.IsLevelEnabled(logEntry.Level) {
-	// 			logEntry.Debugf("prepare generate advice for user,independentQuery:%s", independentQuery)
-	// 		}
-	// 		advice, err := engine.askUser(independentQuery, curUser, resp.Hits)
-
-	// 		if err != nil {
-	// 			logEntry.Error("gen advice error:", err.Error())
-	// 			return llmutil.CHAT_TYPE_MSG, "", err
-	// 		}
-	// 		engine.saveChatHistory(curUser, room, query, advice)
-	// 		return llmutil.CHAT_TYPE_MSG, advice, nil
-	// 	} else {
-	// 		logEntry.Infof("hit sku less than %d", hitThreshold)
-	// 	}
-	// }
 
 	//给用户推荐产品
 	independentQuery := shoppingIntent.IndependentQuery
@@ -177,13 +140,18 @@ func (engine *ShoppingEngine) Flow(curUser user.User, room, query string) (strin
 		//todo:全部上下文
 		independentQuery = query
 	}
-	respSku, err := engine.recommend(independentQuery, curUser, resp.Hits)
-
+	respSku, err := task.recommend(independentQuery, curUser, resp.Hits)
+	if err == nil {
+		task.output = respSku
+		task.status = llmutil.RUN_DONE
+	} else {
+		task.status = llmutil.RUN_ERR
+	}
 	return llmutil.CHAT_TYPE_SHOPPING, respSku, err
 
 }
 
-func (engine *ShoppingEngine) PlanB(curUser user.User, room, query string) (string, any, error) {
+func (task *WalmartProductListTask) PlanB(curUser user.User, room, query string) (llmutil.TaskOutputType, any, error) {
 
 	if len(query) > 512 {
 		query = query[:512]
@@ -200,7 +168,7 @@ func (engine *ShoppingEngine) PlanB(curUser user.User, room, query string) (stri
 		IndependentQuery: query,
 	}
 
-	resp, err := engine.search(&shoppingIntent)
+	resp, err := task.search(&shoppingIntent)
 	if err != nil {
 		logEntry.Error("search for shopping intent error:", err.Error())
 		//TODO: 出默认列表
@@ -229,88 +197,7 @@ func (engine *ShoppingEngine) PlanB(curUser user.User, room, query string) (stri
 	return llmutil.CHAT_TYPE_SHOPPING, resultList, err
 }
 
-func (engine *ShoppingEngine) doLLM(logEntry *logger.Entry, llmChain *chains.LLMChain,
-	inputs map[string]any, ctx context.Context) (map[string]any, error) {
-
-	jsonContent, err := engine.doLLMRespStr(logEntry, llmChain, inputs, ctx)
-	if err != nil {
-		return nil, err
-	}
-	respMap := make(map[string]any)
-	err = json.Unmarshal([]byte(jsonContent), &respMap)
-	if err != nil {
-		//todo:重试
-		logEntry.Errorf("%s unmarshal err:%s", jsonContent, err.Error())
-		return nil, err
-	}
-	return respMap, nil
-}
-
-func (engine *ShoppingEngine) doLLMRespList(logEntry *logger.Entry, llmChain *chains.LLMChain,
-	inputs map[string]any, ctx context.Context) ([]map[string]any, error) {
-
-	jsonContent, err := engine.doLLMRespStr(logEntry, llmChain, inputs, ctx)
-	if err != nil {
-		return nil, err
-	}
-	respMap := make([]map[string]any, 0)
-	err = json.Unmarshal([]byte(jsonContent), &respMap)
-	if err != nil {
-		//todo:重试
-		logEntry.Errorf("%s unmarshal err:%s", jsonContent, err.Error())
-		return nil, err
-	}
-	return respMap, nil
-}
-
-func (engine *ShoppingEngine) doLLMRespStr(logEntry *logger.Entry, llmChain *chains.LLMChain,
-	inputs map[string]any, ctx context.Context) (string, error) {
-
-	llmStartTime := time.Now().UnixMilli()
-	result, err := llmChain.Call(ctx, inputs)
-	llmEndTime := time.Now().UnixMilli()
-
-	logEntry.Infof("llm time:%d", llmEndTime-llmStartTime)
-	if err != nil {
-		//todo:重试
-		logEntry.Error("call llm err:", err.Error())
-		return "", err
-	}
-
-	text, ok := result["text"]
-
-	if !ok {
-
-		buf, _ := json.Marshal(result)
-		logEntry.Errorf("llm response:%s", string(buf))
-		return "", errors.New("llm response err")
-	}
-	content, ok := text.(string)
-	if !ok {
-		kindStr := reflect.TypeOf(text).Kind().String()
-		logEntry.Errorf("text type:%s", kindStr)
-		return "", errors.New("err type:" + kindStr)
-	}
-
-	start := strings.Index(content, "{")
-	end := strings.LastIndex(content, "}")
-
-	list_start := strings.Index(content, "[")
-	list_end := strings.LastIndex(content, "]")
-
-	if list_start >= 0 && list_start < start {
-		start = list_start
-		end = list_end
-	}
-
-	if start == -1 || end == -1 {
-		return "", common.Errorf(fmt.Sprintf("parse json:%d,%d", start, end), errors.New("invalid json:"+content))
-	}
-	jsonContent := content[start : end+1]
-	return jsonContent, nil
-}
-
-func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, relDocs []*detail.WalmartSkuResp) (string, error) {
+func (task *WalmartProductListTask) askUser(indepQuestion string, curUser user.User, relDocs []*detail.WalmartSkuResp) (string, error) {
 	//追问用户提供一些商品属性相关的喜好,使用查到的商品的属性名做为模板
 	logEntry := logger.WithField("uid", curUser.UserId)
 	cates := make(map[string]string)
@@ -361,7 +248,7 @@ func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, r
 	inputs["context"] = conversationContext.String()
 	inputs["props"] = propsBuild.String()
 	ctx := context.Background()
-	adviceMap, err := engine.doLLM(logEntry, llmChain, inputs, ctx)
+	adviceMap, err := doLLM(logEntry, llmChain, inputs, ctx)
 
 	if err != nil {
 		logEntry.Error("request llm err:", err.Error())
@@ -388,7 +275,7 @@ func (engine *ShoppingEngine) askUser(indepQuestion string, curUser user.User, r
 
 }
 
-func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User, relDocs []*detail.WalmartSkuResp) ([]*detail.RecommendWalmartSkuResponse, error) {
+func (task *WalmartProductListTask) recommend(indepQuestion string, curUser user.User, relDocs []*detail.WalmartSkuResp) ([]*detail.RecommendWalmartSkuResponse, error) {
 	//追问用户提供一些商品属性相关的喜好,使用查到的商品的属性名做为模板
 	logEntry := logger.WithField("uid", curUser.UserId)
 	idMap := make(map[string]*detail.WalmartSkuResp)
@@ -425,7 +312,7 @@ func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User,
 	inputs["context"] = indepQuestion
 	inputs["sku_list"] = skuBuf.String()
 	ctx := context.Background()
-	skuScoreMap, err := engine.doLLMRespList(logEntry, llmChain, inputs, ctx)
+	skuScoreMap, err := doLLMRespList(logEntry, llmChain, inputs, ctx)
 
 	if err != nil {
 		logEntry.Error("request llm err:", err.Error())
@@ -503,7 +390,7 @@ func (engine *ShoppingEngine) recommend(indepQuestion string, curUser user.User,
 }
 
 // 9解析购物意图
-func (engine *ShoppingEngine) parseIntent(intentMap map[string]any) ShoppingIntent {
+func (task *WalmartProductListTask) parseIntent(intentMap map[string]any) ShoppingIntent {
 	var shoppingIntent ShoppingIntent
 	shoppingIntent.ProductProps = make(map[string]string)
 	//{"完整信息":"","问题1":1,"问题2":""，"问题3":"","问题4":{"":""}}
@@ -615,7 +502,7 @@ type SkuSearchResponse struct {
 	Hits    []*detail.WalmartSkuResp `json:"hits"`
 }
 
-func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse, error) {
+func (task *WalmartProductListTask) search(intent *ShoppingIntent) (*SkuSearchResponse, error) {
 	matchs := make([]map[string]any, 0)
 	if len(intent.ProductName) > 0 {
 		matchs = append(matchs, map[string]any{"match": map[string]any{
@@ -656,8 +543,8 @@ func (engine *ShoppingEngine) search(intent *ShoppingIntent) (*SkuSearchResponse
 	//TODO:使用属性进行匹配,目前ES索引没有使用嵌套或者object结构，不能进行嵌套查询
 
 	query := map[string]any{
-		"size":   4,
-		"fields": []string{"ItemId", "Timestamp", "Aisle", "ParentItemId", "Color", "MediumImage", "Name", "BrandName", "CategoryPath", "SalePrice", "ShortDescription", "LongDescription"},
+		"size":    4,
+		"_source": []string{"ItemId", "Timestamp", "Aisle", "ParentItemId", "Color", "MediumImage", "Name", "BrandName", "CategoryPath", "SalePrice", "ShortDescription", "LongDescription"},
 		"query": map[string]any{
 			"bool": map[string]any{
 				"should": matchs,

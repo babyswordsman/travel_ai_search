@@ -8,7 +8,7 @@ from typing_extensions import Annotated
 
 from pprint import pprint
 import embedding_server
-import rerank_server_onnx
+# import rerank_server_onnx
 
 class QueryRequest(BaseModel):
     queries:List[str]
@@ -45,13 +45,13 @@ async def embed_passage(req:PassageRequest) -> Any:
     print("embed_passage exec times:",time.time()-start_time)
     return resp
 
-@app.post("/reranker/predict",response_model=RerankerResponse) 
-async def reranker_predict(req:RerankerRequest) -> Any:
-    start_time = time.time()
-    res = rerank_server_onnx.predict(req.q_p_pairs)
-    resp = RerankerResponse(scores = res)
-    print("reranker_predict exec times:",time.time()-start_time)
-    return resp
+# @app.post("/reranker/predict",response_model=RerankerResponse) 
+# async def reranker_predict(req:RerankerRequest) -> Any:
+#     start_time = time.time()
+#     res = rerank_server_onnx.predict(req.q_p_pairs)
+#     resp = RerankerResponse(scores = res)
+#     print("reranker_predict exec times:",time.time()-start_time)
+#     return resp
 
 def getTimestamp():
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
