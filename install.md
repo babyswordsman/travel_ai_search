@@ -95,6 +95,19 @@ $/home/service/app#
             ├── shopping.html
             └── upload.html
 ```
+# https证书
+申请免费证书
+在https://freessl.cn/上申请90天免费证书
+
+使用说明见：
+https://blog.freessl.cn/how-to-use-freessl-acme-to-automatically-apply-for-certificates/
+
+https://github.com/acmesh-official/acme.sh/wiki/%E8%AF%B4%E6%98%8E
+
+验证信息见：
+https://freessl.cn/automation/auth
+
+
 # python3环境依赖包
 ```
 Package                  Version
