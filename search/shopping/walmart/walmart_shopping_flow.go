@@ -66,7 +66,7 @@ var availableTools = []llms.Tool{
 		Type: "function",
 		Function: &llms.FunctionDefinition{
 			Name:        "getProductDetail",
-			Description: "get detailed information of the products, such as ID, product name, product description(contains taste/purpose/ingredient/component list etc)",
+			Description: "Get detailed product information, such as flavor, ingredients, toppings, accessories, specifications, etc.",
 			Parameters: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -142,6 +142,7 @@ func funcRoute(curUser user.User, room, query string) (llmutil.TaskOutputType, a
 		logEntry.Errorf("call llm err:%s", err.Error())
 		return "", nil, err
 	}
+	
 	logEntry.Infof("toolcall num:%d", len(resp.Choices[0].ToolCalls))
 	for _, toolCall := range resp.Choices[0].ToolCalls {
 		logEntry.Infof("toolcall:%s(%s)", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
