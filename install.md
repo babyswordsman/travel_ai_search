@@ -28,6 +28,7 @@ model_service/save_to_onnx.py
 - elasticsearch https://github.com/elastic/elasticsearch/releases/tag/v8.14.1
 
 # 部署目录见下方的部署目录结构
+```
 $/home/service/app#
 ├── elasticsearch-8.14.1  # ES的安装根目录
 ├── model_zoo # 存放模型文件
@@ -93,8 +94,9 @@ $/home/service/app#
             ├── output.css
             ├── shopping.html
             └── upload.html
-
+```
 # python3环境依赖包
+```
 Package                  Version
 ------------------------ ----------------
 aiohttp                  3.9.3
@@ -241,8 +243,10 @@ xxhash                   3.4.1
 yarl                     1.9.4
 zipp                     1.0.0
 zope.interface           5.4.0
+```
 
 # 部署目录结构
+```
 $/home/service/app#
 ├── elasticsearch-8.14.1
 ├── model_zoo
@@ -325,5 +329,5 @@ $/home/service/app#
             ├── output.css
             ├── shopping.html
             └── upload.html
-
+```
 
