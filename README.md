@@ -95,3 +95,7 @@ $ java -jar tika-server/target/tika-server.jar --help
                         if there is an exception during 'parse'
 ```
 
+# 非ROOT账号绑定443/80端口启动
+```
+sudo setcap 'cap_net_bind_service=+ep' /home/service/app/travel_ai_search/ai_search_server
+```

@@ -3,14 +3,15 @@ package modelclient
 import (
 	"net/http"
 	"travel_ai_search/search/conf"
-	logger "github.com/sirupsen/logrus"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	logger "github.com/sirupsen/logrus"
 )
 
-func EmbeddingQuery(c *gin.Context){
-	queries := make([]string,0) 
-	if err := c.ShouldBindBodyWith(&queries,binding.JSON);err != nil {
+func EmbeddingQuery(c *gin.Context) {
+	queries := make(map[string][]string)
+	if err := c.ShouldBindBodyWith(&queries, binding.JSON); err != nil {
 		logger.Errorf("parse {%s} err:%s", c.GetString(gin.BodyBytesKey), err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"err": conf.ErrHint,
@@ -18,22 +19,21 @@ func EmbeddingQuery(c *gin.Context){
 		return
 	}
 
-	values, err := GetInstance().QueryEmbedding(queries)
+	values, err := GetInstance().QueryEmbedding(queries["queries"])
 	if err != nil {
-		c.JSON(http.StatusInternalServerError,gin.H{
-			"err":conf.ErrHint,
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"err": conf.ErrHint,
 		})
 		return
 	}
-	c.JSON(http.StatusOK,gin.H{
-		"embs":values,
+	c.JSON(http.StatusOK, gin.H{
+		"embs": values,
 	})
 }
 
-
-func EmbeddingPassage(c *gin.Context){
-	passages := make([]string,0) 
-	if err := c.ShouldBindBodyWith(&passages,binding.JSON);err != nil {
+func EmbeddingPassage(c *gin.Context) {
+	passages := make(map[string][]string)
+	if err := c.ShouldBindBodyWith(&passages, binding.JSON); err != nil {
 		logger.Errorf("parse {%s} err:%s", c.GetString(gin.BodyBytesKey), err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"err": conf.ErrHint,
@@ -41,21 +41,21 @@ func EmbeddingPassage(c *gin.Context){
 		return
 	}
 
-	values, err := GetInstance().PassageEmbedding(passages)
+	values, err := GetInstance().PassageEmbedding(passages["passages"])
 	if err != nil {
-		c.JSON(http.StatusInternalServerError,gin.H{
-			"err":conf.ErrHint,
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"err": conf.ErrHint,
 		})
 		return
 	}
-	c.JSON(http.StatusOK,gin.H{
-		"embs":values,
+	c.JSON(http.StatusOK, gin.H{
+		"embs": values,
 	})
 }
 
-func PredictReranker(c *gin.Context){
-	query_passages := make([][2]string,0) 
-	if err := c.ShouldBindBodyWith(&query_passages,binding.JSON);err != nil {
+func PredictReranker(c *gin.Context) {
+	query_passages := make(map[string][][2]string)
+	if err := c.ShouldBindBodyWith(&query_passages, binding.JSON); err != nil {
 		logger.Errorf("parse {%s} err:%s", c.GetString(gin.BodyBytesKey), err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"err": conf.ErrHint,
@@ -63,16 +63,14 @@ func PredictReranker(c *gin.Context){
 		return
 	}
 
-	values, err := GetInstance().PredictorRerankerScore(query_passages)
+	values, err := GetInstance().PredictorRerankerScore(query_passages["q_p_pairs"])
 	if err != nil {
-		c.JSON(http.StatusInternalServerError,gin.H{
-			"err":conf.ErrHint,
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"err": conf.ErrHint,
 		})
 		return
 	}
-	c.JSON(http.StatusOK,gin.H{
-		"scores":values,
+	c.JSON(http.StatusOK, gin.H{
+		"scores": values,
 	})
 }
-
-
