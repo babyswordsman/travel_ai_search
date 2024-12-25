@@ -3,6 +3,7 @@ package kvclient
 import (
 	"fmt"
 	"sync"
+	"travel_ai_search/search/common"
 )
 
 var GLOBAL_DETAIL_ID_KEY = "global_detail_id"
@@ -19,11 +20,10 @@ type IdGen struct {
 var detailIdGen *IdGen
 var skuIdGen *IdGen
 
-func StartIdGen(){
+func StartIdGen() {
 	detailIdGen = InitIdGen(GLOBAL_DETAIL_ID_KEY)
 	skuIdGen = InitIdGen(GLOBAL_SKU_ID_KEY)
 }
-
 
 func FetchDetailNextId() (uint64, error) {
 	return detailIdGen.NextId()
@@ -63,7 +63,7 @@ func (idGen *IdGen) NextId() (uint64, error) {
 
 	if idGen.cacheIdUpper <= idGen.nextId {
 		for i := 0; i < 3; i++ {
-			step := max(int64(idGen.step), int64(idGen.nextId)-int64(idGen.cacheIdUpper))
+			step := common.Max(int64(idGen.step), int64(idGen.nextId)-int64(idGen.cacheIdUpper))
 			val, err := GetInstance().IncrBy(idGen.key, step)
 			if err != nil {
 				continue

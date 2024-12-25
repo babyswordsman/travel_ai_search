@@ -103,3 +103,11 @@ func GetUploadPath(config *conf.Config) string {
 	dir, _ := filepath.Split(config.CrawlerDataPath)
 	return dir
 }
+
+func Max[T int | int64](x, y T) T {
+	if x >= y {
+		return x
+	} else {
+		return y
+	}
+}

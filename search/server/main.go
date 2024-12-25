@@ -12,6 +12,7 @@ import (
 	initclients "travel_ai_search/search/init_clients"
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/llm"
+	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/user"
 
 	"github.com/gin-contrib/cors"
@@ -74,6 +75,13 @@ func init_router(r *gin.Engine) {
 	manage_route := r.Group("manage")
 	{
 		manage_route.GET("/init_data", search.InitData)
+	}
+
+	modelproxy := r.Group("model")
+	{
+		modelproxy.POST("/embedding/query", modelclient.EmbeddingQuery)
+		modelproxy.POST("/embedding/passage", modelclient.EmbeddingPassage)
+		modelproxy.POST("/reranker/predict", modelclient.PredictReranker)
 	}
 
 	store := cookie.NewStore([]byte(conf.GlobalConfig.CookieCodeKey))
