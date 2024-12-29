@@ -58,7 +58,69 @@ type ShoppingEngine struct {
 // }
 
 func (engine *ShoppingEngine) Flow(curUser user.User, room, input string) (llmutil.TaskOutputType, any, error) {
-	return funcRoute(curUser, room, input)
+	funName, args, err := funcRoute(curUser, room, input)
+	if err != nil {
+		return "", nil, fmt.Errorf("no function")
+	}
+	return engine.CallTask(curUser, room, input, funName, args)
+}
+
+func (engine *ShoppingEngine) CallTask(curUser user.User, room string, query string, funName string,
+	args string) (llmutil.TaskOutputType, any, error) {
+	logEntry := logger.WithField("uid", curUser.UserId)
+	switch funName {
+
+	case "searchProducts":
+		//args := toolCall.FunctionCall.Arguments
+		var queryArgs struct {
+			Query string `json:"query"`
+		}
+		if err := json.Unmarshal([]byte(args), &queryArgs); err != nil {
+			logEntry.Errorf("searchProducts args(%s) unmarshal err:%s", args, err.Error())
+		}
+		logEntry.Infof("search func argument:query:%s", queryArgs.Query)
+		task := &WalmartProductListTask{}
+		outputType, output, err := task.Run(curUser, room, query)
+		if err == nil {
+			saveChatHistory(curUser, room, query, task.FormatOutput())
+		}
+		return outputType, output, err
+
+	case "getProductDetail":
+		var idArgs struct {
+			ProductIds []string `json:"product_ids"`
+		}
+
+		if err := json.Unmarshal([]byte(args), &idArgs); err != nil {
+			logEntry.Errorf("getProductDetail args(%s) unmarshal err:%s", args, err.Error())
+		}
+		task := &WalmartProductDetailTask{}
+		outputType, output, err := task.Call(curUser, room, idArgs.ProductIds)
+		if err == nil {
+			saveChatHistory(curUser, room, query, task.FormatOutput())
+		}
+		return outputType, output, err
+
+	case "chat":
+		//args := toolCall.FunctionCall.Arguments
+		var queryArgs struct {
+			Input string `json:"input"`
+		}
+		if err := json.Unmarshal([]byte(args), &queryArgs); err != nil {
+			logEntry.Errorf("chat args(%s) unmarshal err:%s", args, err.Error())
+		}
+		logEntry.Infof("chat func argument:query:%s", queryArgs.Input)
+		task := &WalmartChatTask{}
+		outputType, output, err := task.Run(curUser, room, query)
+		if err == nil {
+			saveChatHistory(curUser, room, query, task.FormatOutput())
+		}
+		return outputType, output, err
+
+	default:
+		logEntry.Errorf("undefined func:%s", funName)
+	}
+	return "", nil, fmt.Errorf("no function")
 }
 
 var availableTools = []llms.Tool{
@@ -71,7 +133,10 @@ var availableTools = []llms.Tool{
 				"type": "object",
 				"properties": map[string]any{
 					"product_ids": map[string]any{
-						"type":        "array of string",
+						"type": "array",
+						"items": map[string]any{
+							"type": "string",
+						},
 						"description": "list of the product id",
 					},
 				},
@@ -115,13 +180,13 @@ var availableTools = []llms.Tool{
 	},
 }
 
-func funcRoute(curUser user.User, room, query string) (llmutil.TaskOutputType, any, error) {
+func funcRoute(curUser user.User, room, query string) (string, string, error) {
 	ctx := context.Background()
 	llm, err := NewDashScopeModel()
 	logEntry := logger.WithField("uid", curUser.UserId)
 	if err != nil {
 		logEntry.Errorf("create llm client err:%s", err.Error())
-		return "", nil, err
+		return "", "", err
 	}
 	chatHistorys := llmutil.GetHistoryStoreInstance().LoadChatHistoryForLLM(curUser.UserId, room)
 	messageHistory := make([]llms.MessageContent, 0)
@@ -140,64 +205,13 @@ func funcRoute(curUser user.User, room, query string) (llmutil.TaskOutputType, a
 	resp, err := llm.GenerateContent(ctx, messageHistory, llms.WithTools(availableTools))
 	if err != nil {
 		logEntry.Errorf("call llm err:%s", err.Error())
-		return "", nil, err
+		return "", "", err
 	}
 	logEntry.Infof("toolcall num:%d", len(resp.Choices[0].ToolCalls))
+
 	for _, toolCall := range resp.Choices[0].ToolCalls {
 		logEntry.Infof("toolcall:%s(%s)", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
-
-		switch toolCall.FunctionCall.Name {
-
-		case "searchProducts":
-			//args := toolCall.FunctionCall.Arguments
-			var queryArgs struct {
-				Query string `json:"query"`
-			}
-			if err := json.Unmarshal([]byte(toolCall.FunctionCall.Arguments), &queryArgs); err != nil {
-				logEntry.Errorf("searchProducts args(%s) unmarshal err:%s", toolCall.FunctionCall.Arguments, err.Error())
-			}
-			logEntry.Infof("search func argument:query:%s", queryArgs.Query)
-			task := &WalmartProductListTask{}
-			outputType, output, err := task.Run(curUser, room, query)
-			if err == nil {
-				saveChatHistory(curUser, room, query, task.FormatOutput())
-			}
-			return outputType, output, err
-
-		case "getProductDetail":
-			var idArgs struct {
-				ProductIds []string `json:"product_ids"`
-			}
-
-			if err := json.Unmarshal([]byte(toolCall.FunctionCall.Arguments), &idArgs); err != nil {
-				logEntry.Errorf("getProductDetail args(%s) unmarshal err:%s", toolCall.FunctionCall.Arguments, err.Error())
-			}
-			task := &WalmartProductDetailTask{}
-			outputType, output, err := task.Call(curUser, room, idArgs.ProductIds)
-			if err == nil {
-				saveChatHistory(curUser, room, query, task.FormatOutput())
-			}
-			return outputType, output, err
-
-		case "chat":
-			//args := toolCall.FunctionCall.Arguments
-			var queryArgs struct {
-				Input string `json:"input"`
-			}
-			if err := json.Unmarshal([]byte(toolCall.FunctionCall.Arguments), &queryArgs); err != nil {
-				logEntry.Errorf("chat args(%s) unmarshal err:%s", toolCall.FunctionCall.Arguments, err.Error())
-			}
-			logEntry.Infof("chat func argument:query:%s", queryArgs.Input)
-			task := &WalmartChatTask{}
-			outputType, output, err := task.Run(curUser, room, query)
-			if err == nil {
-				saveChatHistory(curUser, room, query, task.FormatOutput())
-			}
-			return outputType, output, err
-
-		default:
-			logEntry.Errorf("undefined func:%s", toolCall.FunctionCall.Name)
-		}
+		return toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments, nil
 	}
-	return "", nil, fmt.Errorf("no function")
+	return "", "", fmt.Errorf("no function")
 }
