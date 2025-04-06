@@ -78,7 +78,7 @@ func (engine *ShoppingEngine) CallTask(curUser user.User, room string, query str
 		if err := json.Unmarshal([]byte(args), &queryArgs); err != nil {
 			logEntry.Errorf("searchProducts args(%s) unmarshal err:%s", args, err.Error())
 		}
-		logEntry.Infof("search func argument:query:%s", queryArgs.Query)
+		logEntry.Infof("search func argument:query:%s,input query:%s", queryArgs.Query,query)
 		task := &WalmartProductListTask{}
 		outputType, output, err := task.Run(curUser, room, query)
 		if err == nil {

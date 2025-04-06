@@ -16,8 +16,42 @@ import (
 	"travel_ai_search/search/shopping/detail"
 	"travel_ai_search/search/user"
 
+	"github.com/bytedance/mockey"
 	logger "github.com/sirupsen/logrus"
+
+	"github.com/smartystreets/goconvey/convey"
 )
+
+func TestGenIntent(t *testing.T) {
+	logger.SetLevel(logger.DebugLevel)
+	logger.SetReportCaller(true)
+	path := common.GetTestConfigPath()
+	t.Log("config path：", path)
+	config, err := conf.ParseConfig(path)
+	if err != nil {
+		t.Error("parse config err ", err.Error())
+		return
+	}
+	conf.GlobalConfig = config
+	initclients.Start_client(config)
+	defer initclients.Stop_client()
+	llmutil.InitMemHistoryStoreInstance(5)
+	engine := WalmartProductListTask{}
+	mockey.PatchConvey("test gen intent", t, func() {
+		intentMapStr := `{"Complete information":"Crispy cookies","Question 1":1,"Question 2":"Food","Question 3":"Cookies","Question 4":{"Texture":"Crispy"}}`
+		intentMap := make(map[string]any)
+		err := json.Unmarshal([]byte(intentMapStr), &intentMap)
+		convey.So(err, convey.ShouldBeNil)
+		mockey.Mock(doLLM).Return(intentMap, nil).Build()
+		//Content:
+		intent, err := engine.GenShoppingIntent(getTestUser(), SHOPPING_ROOM, "I want to buy some crispy cookies")
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(intent, convey.ShouldNotBeNil)
+		convey.So(intent.IsShopping, convey.ShouldBeTrue)
+
+	})
+
+}
 
 func TestShoppingFlow(t *testing.T) {
 	logger.SetLevel(logger.DebugLevel)

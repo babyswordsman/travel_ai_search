@@ -78,18 +78,15 @@ const SHOPPING_INDEX_NAME = "wal_sku"
 const UNMATCH_SHOPPING_HIT = `我不太清楚您的问题，我是一个购物小助手，请问我购物相关的问题吧`
 const EMPTY_SHOPPING_HIT = `暂时没有符合您要求的商品，可以想想还需要购买其他商品吗？`
 
-// return:
-// type  shop or msg
-// body  product infor or text msg
-// error
-func (task *WalmartProductListTask) Run(curUser user.User, room, query string) (llmutil.TaskOutputType, any, error) {
+func (task *WalmartProductListTask) GenShoppingIntent(curUser user.User, room, query string) (*ShoppingIntent, error) {
 	ctx := context.Background()
 	llm, err := NewDashScopeModel()
 	logEntry := logger.WithField("uid", curUser.UserId)
+
 	if err != nil {
 		logEntry.Errorf("create llm client err:%s", err.Error())
 		task.status = llmutil.RUN_ERR
-		return llmutil.CHAT_TYPE_MSG, "", err
+		return nil, err
 	}
 
 	defaultQAPromptTemplate := prompts.NewPromptTemplate(
@@ -107,19 +104,38 @@ func (task *WalmartProductListTask) Run(curUser user.User, room, query string) (
 	inputs["question"] = query
 	inputs["context"] = conversationContext(curUser, room)
 
+	logEntry.Infof("inputs:%+v", inputs)
+	logEntry.Infof("qa prompt:%+v", prompt.Template)
+
 	intentMap, err := doLLM(logEntry, llmChain, inputs, ctx)
 
 	if err != nil {
 		task.status = llmutil.RUN_ERR
-		return llmutil.CHAT_TYPE_MSG, "", common.Errorf("request intent err", err)
+		return nil, common.Errorf("request intent err", err)
 	}
 
 	shoppingIntent := task.parseIntent(intentMap)
+	return &shoppingIntent, nil
+}
+
+// return:
+// type  shop or msg
+// body  product infor or text msg
+// error
+func (task *WalmartProductListTask) Run(curUser user.User, room, query string) (llmutil.TaskOutputType, any, error) {
+	logEntry := logger.WithField("uid", curUser.UserId)
+
+	shoppingIntent, err := task.GenShoppingIntent(curUser, room, query)
+	if err != nil {
+		logEntry.Error("gen shopping intent error:", err.Error())
+		task.status = llmutil.RUN_ERR
+		//TODO: 出默认列表
+		return llmutil.CHAT_TYPE_MSG, "", nil
+	}
 	if !shoppingIntent.IsShopping {
 		return llmutil.CHAT_TYPE_MSG, UNMATCH_SHOPPING_HIT, nil
 	}
-
-	resp, err := task.search(&shoppingIntent)
+	resp, err := task.search(shoppingIntent)
 	if err != nil {
 		logEntry.Error("search for shopping intent error:", err.Error())
 		task.status = llmutil.RUN_ERR
