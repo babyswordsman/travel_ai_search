@@ -13,6 +13,7 @@ import (
 	"travel_ai_search/search/kvclient"
 	"travel_ai_search/search/llm"
 	"travel_ai_search/search/modelclient"
+	"travel_ai_search/search/shopping/walmart"
 	"travel_ai_search/search/user"
 
 	"github.com/gin-contrib/cors"
@@ -180,6 +181,9 @@ func main() {
 	//r.StaticFile("/index.html", "./resource/web/index.html")
 	init_router(r)
 	logger.Info("start gin: ", config.ServerAddr)
+
+	defer walmart.CloseLogFile()
+
 	if len(config.TlsServerAddr) < 1 {
 		r.Run(config.ServerAddr)
 	} else {

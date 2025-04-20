@@ -2,6 +2,7 @@ package walmart
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -27,15 +28,24 @@ type WalmartProductListTask struct {
 }
 
 func (task *WalmartProductListTask) FormatOutput() string {
-	var buf strings.Builder
-	for i, sku := range task.output {
-		if i > 0 {
-			buf.WriteString("\r\n")
-		}
-		buf.WriteString(fmt.Sprintf("product id:%s, product name:%s, Aisle:%s, price:%.2f",
-			sku.ProductId, sku.ProductName, sku.Aisle, sku.ProductPrice))
+
+	skuMap := make([]map[string]any, 0)
+	for _, sku := range task.output {
+		skuMap = append(skuMap, map[string]any{
+			"product_id":    sku.ProductId,
+			"product_name":  sku.ProductName,
+			"product_aisle": sku.Aisle,
+			"product_price": sku.ProductPrice,
+		})
+
 	}
-	return buf.String()
+	buf, err := json.Marshal(skuMap)
+	if err != nil {
+		logger.Errorf("marshal err:%s", err.Error())
+		return ""
+	}
+	return string(buf)
+	//return buf.String()
 	// if task.Status() != 1 {
 	// 	return ""
 	// }

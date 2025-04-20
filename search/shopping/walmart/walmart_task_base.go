@@ -100,7 +100,7 @@ func doLLMRespJsonStr(logEntry *logger.Entry, llmChain *chains.LLMChain,
 	inputs map[string]any, ctx context.Context) (string, error) {
 
 	llmStartTime := time.Now().UnixMilli()
-result, err := llmChain.Call(ctx, inputs)
+	result, err := llmChain.Call(ctx, inputs)
 	llmEndTime := time.Now().UnixMilli()
 
 	logEntry.Infof("llm time:%d", llmEndTime-llmStartTime)

@@ -30,6 +30,7 @@ type PromptTemplate struct {
 	AgentRouting            string `yaml:"agent_routing"`
 	WalmartExtractProductId string `yaml:"walmart_extract_product_id"`
 	WalmartChat             string `yaml:"walmart_chat"`
+	TasKRouter              string `yaml:"task_router"`
 }
 
 type DashScopeLLM struct {
@@ -159,4 +160,3 @@ func AgentTemplate(conf *Config, flowName string) string {
 	}
 	return buf.String()
 }
-

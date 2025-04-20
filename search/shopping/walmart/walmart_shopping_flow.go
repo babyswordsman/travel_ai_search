@@ -4,17 +4,46 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sync"
 	"time"
+	"travel_ai_search/search/conf"
 	llmutil "travel_ai_search/search/llm"
 	"travel_ai_search/search/user"
 
 	logger "github.com/sirupsen/logrus"
+	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/prompts"
 )
 
 const SHOPPING_FLOWID = "shopping"
 
 type ShoppingEngine struct {
+}
+
+var chatLoggerOnce sync.Once
+var chatLogger *logger.Logger
+var chatLogFile *os.File
+
+func GetChatLogger() *logger.Logger {
+	chatLoggerOnce.Do(func() {
+		var err error
+		chatLogFile, err = os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Printf("无法打开日志文件: %v\n", err)
+			return
+		}
+		chatLogger = logger.New()
+		chatLogger.SetOutput(chatLogFile)
+	})
+	return chatLogger
+}
+
+func CloseLogFile() {
+	if chatLogFile != nil {
+		chatLogFile.Close()
+	}
 }
 
 // func (engine *ShoppingEngine) Flow(curUser user.User, room, input string) (llmutil.TaskOutputType, any, error) {
@@ -58,9 +87,14 @@ type ShoppingEngine struct {
 // }
 
 func (engine *ShoppingEngine) Flow(curUser user.User, room, input string) (llmutil.TaskOutputType, any, error) {
-	funName, args, err := funcRoute(curUser, room, input)
+	// funName, args, err := funcRoute(curUser, room, input)
+	// if err != nil {
+	// 	return "", nil, fmt.Errorf("no function")
+	// }
+	funName, args, err := taskRoute(curUser, room, input)
 	if err != nil {
-		return "", nil, fmt.Errorf("no function")
+		//return "", nil, fmt.Errorf("no function")
+		engine.CallTask(curUser, room, input, "chat", "")
 	}
 	return engine.CallTask(curUser, room, input, funName, args)
 }
@@ -78,12 +112,15 @@ func (engine *ShoppingEngine) CallTask(curUser user.User, room string, query str
 		if err := json.Unmarshal([]byte(args), &queryArgs); err != nil {
 			logEntry.Errorf("searchProducts args(%s) unmarshal err:%s", args, err.Error())
 		}
-		logEntry.Infof("search func argument:query:%s,input query:%s", queryArgs.Query,query)
+		logEntry.Infof("search func argument:query:%s,input query:%s", queryArgs.Query, query)
 		task := &WalmartProductListTask{}
 		outputType, output, err := task.Run(curUser, room, query)
 		if err == nil {
+			GetChatLogger().Infof("input:%v", query)
+			GetChatLogger().Infof("answer:%+v", task.FormatOutput())
 			saveChatHistory(curUser, room, query, task.FormatOutput())
 		}
+
 		return outputType, output, err
 
 	case "getProductDetail":
@@ -97,22 +134,34 @@ func (engine *ShoppingEngine) CallTask(curUser user.User, room string, query str
 		task := &WalmartProductDetailTask{}
 		outputType, output, err := task.Call(curUser, room, idArgs.ProductIds)
 		if err == nil {
+			GetChatLogger().Infof("input:%v", query)
+			GetChatLogger().Infof("answer:%+v", task.FormatOutput())
 			saveChatHistory(curUser, room, query, task.FormatOutput())
 		}
 		return outputType, output, err
 
 	case "chat":
 		//args := toolCall.FunctionCall.Arguments
-		var queryArgs struct {
-			Input string `json:"input"`
+		if len(args) > 0 {
+			var queryArgs struct {
+				Answer string `json:"answer"`
+			}
+			if err := json.Unmarshal([]byte(args), &queryArgs); err != nil {
+				logEntry.Errorf("chat args(%s) unmarshal err:%s", args, err.Error())
+			} else {
+				logEntry.Infof("chat func argument:query:%s", queryArgs.Answer)
+				GetChatLogger().Infof("input:%v", query)
+				GetChatLogger().Infof("answer:%+v", queryArgs.Answer)
+				saveChatHistory(curUser, room, query, queryArgs.Answer)
+				return llmutil.CHAT_TYPE_MSG, queryArgs.Answer, nil
+			}
 		}
-		if err := json.Unmarshal([]byte(args), &queryArgs); err != nil {
-			logEntry.Errorf("chat args(%s) unmarshal err:%s", args, err.Error())
-		}
-		logEntry.Infof("chat func argument:query:%s", queryArgs.Input)
+
 		task := &WalmartChatTask{}
 		outputType, output, err := task.Run(curUser, room, query)
 		if err == nil {
+			GetChatLogger().Infof("input:%v", query)
+			GetChatLogger().Infof("answer:%+v", task.FormatOutput())
 			saveChatHistory(curUser, room, query, task.FormatOutput())
 		}
 		return outputType, output, err
@@ -214,4 +263,102 @@ func funcRoute(curUser user.User, room, query string) (string, string, error) {
 		return toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments, nil
 	}
 	return "", "", fmt.Errorf("no function")
+}
+
+func taskRoute(curUser user.User, room, query string) (string, string, error) {
+	ctx := context.Background()
+	llm, err := NewDashScopeModel()
+	logEntry := logger.WithField("uid", curUser.UserId)
+	if err != nil {
+		logEntry.Errorf("create llm client err:%s", err.Error())
+		return "", "", err
+	}
+
+	defaultQAPromptTemplate := prompts.NewPromptTemplate(
+		conf.GlobalConfig.PromptTemplate.TasKRouter,
+		[]string{"context", "input"},
+	)
+
+	qaPromptSelector := chains.ConditionalPromptSelector{
+		DefaultPrompt: defaultQAPromptTemplate,
+	}
+
+	prompt := qaPromptSelector.GetPrompt(llm)
+	llmChain := chains.NewLLMChain(llm, prompt)
+	inputs := make(map[string]any)
+	inputs["input"] = query
+	inputs["context"] = conversationContext(curUser, room)
+	if logger.IsLevelEnabled(logger.DebugLevel) {
+		logEntry.Debugf("taskRoute inputs:%v", inputs)
+	}
+	taskRouteMap, err := doLLM(logEntry, llmChain, inputs, ctx)
+	if err != nil {
+		logEntry.Errorf("do llm err:%s", err.Error())
+	}
+	if logger.IsLevelEnabled(logger.DebugLevel) {
+		logEntry.Debugf("taskRoute response taskRouteMap:%+v", taskRouteMap)
+	}
+	if reason, ok := taskRouteMap["reason"]; ok {
+		logEntry.Infof("taskRoute reason:%+v", reason)
+	}
+	taskName := ""
+	if nextTaskName, ok := taskRouteMap["next_task"]; ok {
+		taskName = nextTaskName.(string)
+		logEntry.Infof("next_task:%v", nextTaskName)
+	}
+
+	params, paramExist := taskRouteMap["parameters"]
+
+	//"search" | "productDetail" | "dialogue"
+	switch taskName {
+	case "search":
+		//if paramExist {
+		//paramMap := params.(map[string]interface{})
+		//category, ok := paramMap["category"]
+		//keywords
+		//attributes
+		//}
+		return "searchProducts", "", nil
+	case "productDetail":
+		if paramExist {
+			paramMap := params.(map[string]interface{})
+			productIds, ok := paramMap["product_ids"]
+			productIdStrList := make([]string, 0)
+			if ok {
+				productIdList := productIds.([]interface{})
+				for _, productId := range productIdList {
+					switch productId := productId.(type) {
+					case string:
+						productIdStrList = append(productIdStrList, productId)
+					case float64:
+						productIdStrList = append(productIdStrList, fmt.Sprintf("%d", int(productId)))
+					}
+				}
+				if len(productIdStrList) > 0 {
+					buf, err := json.Marshal(map[string][]string{"product_ids": productIdStrList})
+					if err != nil {
+						return "getProductDetail", "", fmt.Errorf("productIds marshal err:%s", err.Error())
+					}
+					return "getProductDetail", string(buf), nil
+				}
+			}
+		}
+		return "getProductDetail", "", fmt.Errorf("parameter error")
+	case "dialogue":
+		if paramExist {
+			paramMap := params.(map[string]interface{})
+			question, ok := paramMap["question"]
+
+			if ok {
+				buf, err := json.Marshal(map[string]string{"answer": question.(string)})
+				if err != nil {
+					return "chat", "", fmt.Errorf("parameter error")
+				}
+				return "chat", string(buf), nil
+			}
+		}
+		return "chat", "", fmt.Errorf("parameter error")
+	default:
+		return "", "", fmt.Errorf("no function")
+	}
 }
