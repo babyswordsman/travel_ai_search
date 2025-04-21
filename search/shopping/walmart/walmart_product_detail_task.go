@@ -76,7 +76,7 @@ func (task *WalmartProductDetailTask) Run(curUser user.User, room, input string)
 	return llmutil.CHAT_TYPE_MSG, value, nil
 }
 
-func (task *WalmartProductDetailTask) Call(curUser user.User, room string, ids []string) (llmutil.TaskOutputType, any, error) {
+func (task *WalmartProductDetailTask) Call(curUser user.User, room string, query string, ids []string) (llmutil.TaskOutputType, any, error) {
 
 	logEntry := logger.WithField("uid", curUser.UserId)
 
@@ -218,11 +218,11 @@ func (task *WalmartProductDetailTask) FormatOutput() string {
 }
 
 func (task *WalmartProductDetailTask) FormatDetail() string {
-	if len(task.output) == 0 {
+	if len(task.productDetails) == 0 {
 		return ""
 	}
 
-	buf, err := json.Marshal(task.output)
+	buf, err := json.Marshal(task.productDetails)
 	if err != nil {
 		logger.Errorf("marshal err:%s", err.Error())
 		return ""

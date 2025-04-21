@@ -132,7 +132,7 @@ func (engine *ShoppingEngine) CallTask(curUser user.User, room string, query str
 			logEntry.Errorf("getProductDetail args(%s) unmarshal err:%s", args, err.Error())
 		}
 		task := &WalmartProductDetailTask{}
-		outputType, output, err := task.Call(curUser, room, idArgs.ProductIds)
+		outputType, output, err := task.Call(curUser, room, query, idArgs.ProductIds)
 		if err == nil {
 			GetChatLogger().Infof("input:%v", query)
 			GetChatLogger().Infof("answer:%+v", task.FormatOutput())
