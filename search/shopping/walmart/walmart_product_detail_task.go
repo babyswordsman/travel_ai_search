@@ -3,6 +3,7 @@ package walmart
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/es"
@@ -64,7 +65,7 @@ func (task *WalmartProductDetailTask) Run(curUser user.User, room, input string)
 
 	task.productDetails = skuResp.Hits
 
-	value, err := task.chat(curUser, room, task.FormatDetail())
+	value, err := task.chat(curUser, room, input, task.FormatDetail())
 	if err != nil {
 		logEntry.Errorf("chat ids[%v] err:%s", ids, err.Error())
 		task.status = llmutil.RUN_ERR
@@ -89,7 +90,7 @@ func (task *WalmartProductDetailTask) Call(curUser user.User, room string, query
 
 	task.productDetails = skuResp.Hits
 
-	value, err := task.chat(curUser, room, task.FormatDetail())
+	value, err := task.chat(curUser, room, query, task.FormatDetail())
 	if err != nil {
 		logEntry.Errorf("chat ids[%v] err:%s", ids, err.Error())
 		task.status = llmutil.RUN_ERR
@@ -101,7 +102,7 @@ func (task *WalmartProductDetailTask) Call(curUser user.User, room string, query
 	return llmutil.CHAT_TYPE_MSG, value, nil
 }
 
-func (task *WalmartProductDetailTask) chat(curUser user.User, room, input string) (string, error) {
+func (task *WalmartProductDetailTask) chat(curUser user.User, room, input string, productDetail string) (string, error) {
 	ctx := context.Background()
 	llm, err := NewDashScopeModel()
 	logEntry := logger.WithField("uid", curUser.UserId).WithField("room", room)
@@ -124,7 +125,8 @@ func (task *WalmartProductDetailTask) chat(curUser user.User, room, input string
 	llmChain := chains.NewLLMChain(llm, prompt)
 	inputs := make(map[string]any)
 	inputs["question"] = input
-	inputs["context"] = task.FormatOutput()
+	history := conversationContext(curUser, room)
+	inputs["context"] = fmt.Sprintf("%s \r\n %s", history, productDetail)
 
 	str, err := doLLMRespText(logEntry, llmChain, inputs, ctx)
 

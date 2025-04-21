@@ -339,7 +339,14 @@ func Voice(ctx *gin.Context) {
 		return
 	}
 	curUser := user.GetCurUser(ctx)
-
+	if curUser.UserId == user.EmpytUser.UserId {
+		curUser = user.User{
+			UserId:   "voice_1",
+			UserName: "voice",
+			//最后活跃时间
+			Lasttime: time.Now(),
+		}
+	}
 	engine := walmart.ShoppingEngine{}
 	msgType, answer, err := engine.Flow(curUser, "shop", req.Query)
 
