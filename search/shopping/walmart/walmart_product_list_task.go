@@ -12,7 +12,6 @@ import (
 	"travel_ai_search/search/conf"
 	"travel_ai_search/search/es"
 	llmutil "travel_ai_search/search/llm"
-	"travel_ai_search/search/modelclient"
 	"travel_ai_search/search/shopping/detail"
 	"travel_ai_search/search/user"
 
@@ -556,10 +555,10 @@ func (task *WalmartProductListTask) search(intent *ShoppingIntent) (*SkuSearchRe
 		independentQuery = intent.ProductName
 	}
 
-	embs, err := modelclient.GetInstance().QueryEmbedding([]string{independentQuery})
-	if err != nil {
-		return nil, fmt.Errorf("get query emb err")
-	}
+	// embs, err := modelclient.GetInstance().QueryEmbedding([]string{independentQuery})
+	// if err != nil {
+	// 	return nil, fmt.Errorf("get query emb err")
+	// }
 
 	//TODO:使用属性进行匹配,目前ES索引没有使用嵌套或者object结构，不能进行嵌套查询
 
@@ -576,13 +575,13 @@ func (task *WalmartProductListTask) search(intent *ShoppingIntent) (*SkuSearchRe
 				"should": matchs,
 			},
 		},
-		"knn": map[string]any{
-			"field":          "DescVector",
-			"k":              2,
-			"num_candidates": 20,
-			"boost":          10,
-			"query_vector":   embs[0],
-		},
+		// "knn": map[string]any{
+		// 	"field":          "DescVector",
+		// 	"k":              2,
+		// 	"num_candidates": 20,
+		// 	"boost":          10,
+		// 	"query_vector":   embs[0],
+		// },
 	}
 	r, err := es.GetInstance().SearchIndex(SHOPPING_INDEX_NAME, query)
 	if err != nil {
