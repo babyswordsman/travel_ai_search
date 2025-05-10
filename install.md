@@ -107,6 +107,15 @@ https://github.com/acmesh-official/acme.sh/wiki/%E8%AF%B4%E6%98%8E
 验证信息见：
 https://freessl.cn/automation/auth
 
+```
+//切换到root用户
+cd /root/.acme.sh/
+acme.sh --renew -d llm-search.cn --force
+
+cp /root/.acme.sh/llm-search.cn_ecc/llm-search.cn.cer ./travel_ai_search/config/
+cp /root/.acme.sh/llm-search.cn_ecc/llm-search.cn.key ./travel_ai_search/config/
+```
+
 
 # python3环境依赖包
 ```
